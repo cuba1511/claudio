@@ -942,27 +942,63 @@ def main():
     # Iniciar bot con manejo de errores de red
     logger.info("Bot iniciado. Presiona Ctrl+C para detener.")
     
+    # Attempt to close previous connections before starting
     try:
-        application.run_polling(
-            allowed_updates=Update.ALL_TYPES,
-            drop_pending_updates=True,  # Ignorar actualizaciones pendientes al iniciar
-            close_loop=False  # No cerrar el loop al detener
-        )
-    except KeyboardInterrupt:
-        logger.info("Bot detenido por el usuario.")
+        import asyncio
+        asyncio.run(close_previous_connections())
     except Exception as e:
-        logger.error(f"Error en el bot: {e}", exc_info=True)
-        logger.info("Reintentando conexión en 5 segundos...")
-        import time
-        time.sleep(5)
-        # Reintentar
+        logger.debug(f"Could not close previous connections: {e}")
+    
+    retry_count = 0
+    max_retries = 3
+    
+    while retry_count < max_retries:
         try:
             application.run_polling(
                 allowed_updates=Update.ALL_TYPES,
-                drop_pending_updates=True
+                drop_pending_updates=True,  # Ignore pending updates on startup
+                close_loop=False  # Don't close loop on stop
             )
-        except Exception as e2:
-            logger.error(f"Error crítico: {e2}. El bot no puede conectarse.")
+            break  # If we reach here, bot stopped normally
+        except Conflict as e:
+            retry_count += 1
+            logger.error(
+                f"❌ CONFLICT: Another bot instance is running.\n"
+                f"Error: {e}\n\n"
+                f"SOLUTION:\n"
+                f"1. Check if there's another bot instance running in another terminal\n"
+                f"2. Find processes with: ps aux | grep telegram_claude_bot\n"
+                f"3. Kill duplicate processes with: kill <PID>\n"
+                f"4. Or wait a few seconds and restart the bot\n"
+            )
+            if retry_count < max_retries:
+                wait_time = 5 * retry_count
+                logger.info(f"Waiting {wait_time} seconds before retrying ({retry_count}/{max_retries})...")
+                import time
+                time.sleep(wait_time)
+                # Try to close connections again
+                try:
+                    asyncio.run(close_previous_connections())
+                except Exception:
+                    pass
+            else:
+                logger.error("❌ Maximum retries reached. Bot cannot start due to conflict.")
+                logger.error("Please ensure only one bot instance is running.")
+                return
+        except KeyboardInterrupt:
+            logger.info("Bot stopped by user.")
+            break
+        except Exception as e:
+            logger.error(f"Error in bot: {e}", exc_info=True)
+            retry_count += 1
+            if retry_count < max_retries:
+                wait_time = 5
+                logger.info(f"Retrying connection in {wait_time} seconds... ({retry_count}/{max_retries})")
+                import time
+                time.sleep(wait_time)
+            else:
+                logger.error(f"Critical error after {max_retries} attempts: {e}. Bot cannot connect.")
+                return
 
 
 if __name__ == '__main__':
