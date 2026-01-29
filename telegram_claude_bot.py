@@ -880,6 +880,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await process_query(update, context, query, user_id, username)
 
 
+async def close_previous_connections():
+    """
+    Attempts to close any previous bot connections before starting a new one.
+    This helps prevent conflict errors when multiple instances are running.
+    """
+    try:
+        temp_app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+        await temp_app.initialize()
+        await temp_app.stop()
+        await temp_app.shutdown()
+        logger.info("Previous connections closed successfully.")
+    except Exception as e:
+        logger.debug(f"Could not close previous connections (may be normal): {e}")
+
+
 def main():
     """Función principal."""
     if not TELEGRAM_BOT_TOKEN:
