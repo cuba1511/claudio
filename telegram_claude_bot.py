@@ -56,7 +56,7 @@ MAX_MESSAGE_LENGTH = 4096  # Límite de Telegram
 BUFFER_TIMEOUT = float(os.getenv('BUFFER_TIMEOUT', '1.5'))  # Segundos para acumular salida antes de enviar
 # SEGURIDAD: Timeout máximo para ejecución de comandos (en segundos)
 # Previene que comandos maliciosos bloqueen el bot indefinidamente
-COMMAND_TIMEOUT = float(os.getenv('COMMAND_TIMEOUT', '300'))  # Por defecto 5 minutos
+COMMAND_TIMEOUT = float(os.getenv('COMMAND_TIMEOUT', '1800'))  # Por defecto 30 minutos (1800 segundos)
 # SEGURIDAD: Longitud máxima de input para prevenir DoS por mensajes gigantes
 # Previene que usuarios envíen mensajes extremadamente largos que consuman recursos
 MAX_INPUT_LENGTH = int(os.getenv('MAX_INPUT_LENGTH', '10000'))  # Por defecto 10,000 caracteres
