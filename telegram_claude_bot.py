@@ -40,6 +40,9 @@ CLAUDE_CLI_PATH = os.getenv('CLAUDE_CLI_PATH', 'claude')  # Ruta al ejecutable d
 WORKSPACE_PATH = os.getenv('WORKSPACE_PATH', os.getcwd())  # Directorio de trabajo
 MAX_MESSAGE_LENGTH = 4096  # Límite de Telegram
 BUFFER_TIMEOUT = float(os.getenv('BUFFER_TIMEOUT', '1.5'))  # Segundos para acumular salida antes de enviar
+# SEGURIDAD: Timeout máximo para ejecución de comandos (en segundos)
+# Previene que comandos maliciosos bloqueen el bot indefinidamente
+COMMAND_TIMEOUT = float(os.getenv('COMMAND_TIMEOUT', '300'))  # Por defecto 5 minutos
 
 # Configuración de transcripción de voz
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '').strip()  # API key de OpenAI para Whisper
@@ -242,14 +245,42 @@ class ClaudeCodeExecutor:
                     except Exception as e:
                         logger.error(f"[Usuario {user_id}] Error decodificando buffer final: {e}")
             
-            # Leer ambos streams en paralelo
-            await asyncio.gather(
-                read_stream(process.stdout, is_error=False),
-                read_stream(process.stderr, is_error=True)
-            )
-            
-            # Esperar a que el proceso termine
-            returncode = await process.wait()
+            # SEGURIDAD: Ejecutar con timeout para prevenir comandos que bloqueen el bot
+            try:
+                # Leer ambos streams en paralelo con timeout
+                await asyncio.wait_for(
+                    asyncio.gather(
+                        read_stream(process.stdout, is_error=False),
+                        read_stream(process.stderr, is_error=True)
+                    ),
+                    timeout=COMMAND_TIMEOUT
+                )
+                
+                # Esperar a que el proceso termine
+                returncode = await process.wait()
+            except asyncio.TimeoutError:
+                # Timeout alcanzado - matar el proceso
+                logger.warning(f"[Usuario {user_id}] ⚠️ TIMEOUT: Comando excedió {COMMAND_TIMEOUT}s. Terminando proceso...")
+                try:
+                    process.kill()
+                    await process.wait()
+                except Exception as kill_error:
+                    logger.error(f"[Usuario {user_id}] Error matando proceso: {kill_error}")
+                
+                timeout_msg = (
+                    f"⏱️ *Timeout alcanzado*\n\n"
+                    f"El comando excedió el tiempo máximo permitido ({COMMAND_TIMEOUT}s) "
+                    f"y fue terminado por seguridad.\n\n"
+                    f"Esto previene que comandos maliciosos bloqueen el bot indefinidamente."
+                )
+                if error_callback:
+                    await error_callback(timeout_msg)
+                
+                return {
+                    'success': False,
+                    'returncode': -2,  # Código especial para timeout
+                    'timeout': True
+                }
             
             success = returncode == 0
             logger.info(f"[Usuario {user_id}] Comando completado con código: {returncode} (éxito: {success})")
@@ -711,12 +742,26 @@ async def process_query(
         
         # Mostrar resultado final solo si no hubo salida
         if not result['success']:
-            error_msg = f"❌ *Error ejecutando comando (código: {result['returncode']})*"
-            if not has_received_output:
-                try:
-                    await current_message.edit_text(error_msg, parse_mode='Markdown')
-                except Exception:
-                    await update.message.reply_text(error_msg, parse_mode='Markdown')
+            # Manejar timeout específicamente
+            if result.get('timeout'):
+                timeout_msg = (
+                    f"⏱️ *Timeout alcanzado*\n\n"
+                    f"El comando excedió el tiempo máximo permitido ({COMMAND_TIMEOUT}s) "
+                    f"y fue terminado por seguridad.\n\n"
+                    f"Esto previene que comandos maliciosos bloqueen el bot indefinidamente."
+                )
+                if not has_received_output:
+                    try:
+                        await current_message.edit_text(timeout_msg, parse_mode='Markdown')
+                    except Exception:
+                        await update.message.reply_text(timeout_msg, parse_mode='Markdown')
+            else:
+                error_msg = f"❌ *Error ejecutando comando (código: {result['returncode']})*"
+                if not has_received_output:
+                    try:
+                        await current_message.edit_text(error_msg, parse_mode='Markdown')
+                    except Exception:
+                        await update.message.reply_text(error_msg, parse_mode='Markdown')
         elif not has_received_output:
             # Solo mostrar éxito si no hubo ninguna salida
             try:
