@@ -14,6 +14,7 @@ from typing import Optional, Callable
 from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
+from telegram.error import Conflict
 try:
     from openai import OpenAI
     OPENAI_AVAILABLE = True
