@@ -766,6 +766,28 @@ def main():
         logger.error("TELEGRAM_BOT_TOKEN no está configurado. Por favor configúralo en .env")
         return
     
+    # SEGURIDAD: Validar que ALLOWED_USER_IDS esté configurado
+    if not ALLOWED_USER_IDS:
+        logger.error(
+            "❌ SEGURIDAD CRÍTICA: ALLOWED_USER_IDS no está configurado.\n"
+            "El bot NO se iniciará porque esto permitiría acceso público a tu sistema.\n"
+            "Por favor configura ALLOWED_USER_IDS en tu archivo .env con al menos un ID de usuario.\n"
+            "Para obtener tu ID, puedes iniciar el bot temporalmente o usar @userinfobot en Telegram."
+        )
+        print("\n" + "="*70)
+        print("❌ ERROR DE SEGURIDAD CRÍTICA")
+        print("="*70)
+        print("ALLOWED_USER_IDS no está configurado.")
+        print("Esto permitiría que CUALQUIER usuario use el bot y ejecute comandos en tu sistema.")
+        print("\nPara solucionarlo:")
+        print("1. Agrega tu ID de usuario a ALLOWED_USER_IDS en el archivo .env")
+        print("2. Formato: ALLOWED_USER_IDS=123456789")
+        print("3. Para múltiples usuarios: ALLOWED_USER_IDS=123456789,987654321")
+        print("="*70 + "\n")
+        return
+    
+    logger.info(f"✅ Seguridad: {len(ALLOWED_USER_IDS)} usuario(s) autorizado(s)")
+    
     # Crear aplicación
     application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
     
