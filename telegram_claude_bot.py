@@ -14,7 +14,6 @@ from typing import Optional, Callable
 from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
-from telegram.error import Conflict
 try:
     from openai import OpenAI
     OPENAI_AVAILABLE = True
@@ -895,32 +894,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await process_query(update, context, query, user_id, username)
 
 
-async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Global error handler to catch errors that occur during polling.
-    Specifically handles Conflict errors when multiple bot instances are running.
-    """
-    error = context.error
-    
-    if isinstance(error, Conflict):
-        logger.error(
-            f"❌ CONFLICT: Another bot instance is running.\n"
-            f"Error: {error}\n\n"
-            f"SOLUTION:\n"
-            f"1. Check if there's another bot instance running in another terminal\n"
-            f"2. Find processes with: ps aux | grep telegram_claude_bot\n"
-            f"3. Kill duplicate processes with: kill <PID>\n"
-            f"4. Or use the helper script: ./kill_bot_processes.sh\n"
-        )
-        # Stop the application to allow restart
-        if context.application:
-            await context.application.stop()
-            await context.application.shutdown()
-        raise error  # Re-raise to trigger retry logic in main()
-    else:
-        logger.error(f"Exception while handling an update: {error}", exc_info=error)
-
-
 def main():
     """Función principal."""
     if not TELEGRAM_BOT_TOKEN:
@@ -965,57 +938,30 @@ def main():
     # Handler para mensajes de texto
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
-    # Add global error handler to catch Conflict and other errors
-    application.add_error_handler(error_handler)
-    
     # Iniciar bot con manejo de errores de red
     logger.info("Bot iniciado. Presiona Ctrl+C para detener.")
     
-    retry_count = 0
-    max_retries = 3
-    
-    while retry_count < max_retries:
+    try:
+        application.run_polling(
+            allowed_updates=Update.ALL_TYPES,
+            drop_pending_updates=True,  # Ignorar actualizaciones pendientes al iniciar
+            close_loop=False  # No cerrar el loop al detener
+        )
+    except KeyboardInterrupt:
+        logger.info("Bot detenido por el usuario.")
+    except Exception as e:
+        logger.error(f"Error en el bot: {e}", exc_info=True)
+        logger.info("Reintentando conexión en 5 segundos...")
+        import time
+        time.sleep(5)
+        # Reintentar
         try:
             application.run_polling(
                 allowed_updates=Update.ALL_TYPES,
-                drop_pending_updates=True,  # Ignore pending updates on startup
-                close_loop=False  # Don't close loop on stop
+                drop_pending_updates=True
             )
-            break  # If we reach here, bot stopped normally
-        except Conflict as e:
-            retry_count += 1
-            logger.error(
-                f"❌ CONFLICT: Another bot instance is running.\n"
-                f"Error: {e}\n\n"
-                f"SOLUTION:\n"
-                f"1. Check if there's another bot instance running in another terminal\n"
-                f"2. Find processes with: ps aux | grep telegram_claude_bot\n"
-                f"3. Kill duplicate processes with: kill <PID>\n"
-                f"4. Or use the helper script: ./kill_bot_processes.sh\n"
-            )
-            if retry_count < max_retries:
-                wait_time = 5 * retry_count
-                logger.info(f"Waiting {wait_time} seconds before retrying ({retry_count}/{max_retries})...")
-                import time
-                time.sleep(wait_time)
-            else:
-                logger.error("❌ Maximum retries reached. Bot cannot start due to conflict.")
-                logger.error("Please ensure only one bot instance is running.")
-                return
-        except KeyboardInterrupt:
-            logger.info("Bot stopped by user.")
-            break
-        except Exception as e:
-            logger.error(f"Error in bot: {e}", exc_info=True)
-            retry_count += 1
-            if retry_count < max_retries:
-                wait_time = 5
-                logger.info(f"Retrying connection in {wait_time} seconds... ({retry_count}/{max_retries})")
-                import time
-                time.sleep(wait_time)
-            else:
-                logger.error(f"Critical error after {max_retries} attempts: {e}. Bot cannot connect.")
-                return
+        except Exception as e2:
+            logger.error(f"Error crítico: {e2}. El bot no puede conectarse.")
 
 
 if __name__ == '__main__':
