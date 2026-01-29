@@ -43,6 +43,9 @@ BUFFER_TIMEOUT = float(os.getenv('BUFFER_TIMEOUT', '1.5'))  # Segundos para acum
 # SEGURIDAD: Timeout máximo para ejecución de comandos (en segundos)
 # Previene que comandos maliciosos bloqueen el bot indefinidamente
 COMMAND_TIMEOUT = float(os.getenv('COMMAND_TIMEOUT', '300'))  # Por defecto 5 minutos
+# SEGURIDAD: Longitud máxima de input para prevenir DoS por mensajes gigantes
+# Previene que usuarios envíen mensajes extremadamente largos que consuman recursos
+MAX_INPUT_LENGTH = int(os.getenv('MAX_INPUT_LENGTH', '10000'))  # Por defecto 10,000 caracteres
 
 # SEGURIDAD: Rate limiting para prevenir spam/DoS
 # Máximo número de requests permitidas por ventana de tiempo
@@ -734,6 +737,18 @@ async def process_query(
     """
     if not query or not query.strip():
         await update.message.reply_text("Por favor envía un mensaje válido.")
+        return
+    
+    # SEGURIDAD: Validar longitud máxima de input para prevenir DoS
+    if len(query) > MAX_INPUT_LENGTH:
+        logger.warning(f"[SEGURIDAD] Usuario {user_id} (@{username}) envió mensaje demasiado largo: {len(query)} caracteres (máximo: {MAX_INPUT_LENGTH})")
+        await update.message.reply_text(
+            f"❌ *Mensaje demasiado largo*\n\n"
+            f"El mensaje excede el límite máximo permitido de {MAX_INPUT_LENGTH:,} caracteres.\n"
+            f"Tu mensaje tiene {len(query):,} caracteres.\n\n"
+            f"Por favor divide tu mensaje en partes más pequeñas.",
+            parse_mode='Markdown'
+        )
         return
     
     logger.info(f"[Usuario {user_id} (@{username})] Procesando query: {query[:100]}...")
