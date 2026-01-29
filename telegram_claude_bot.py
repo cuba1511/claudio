@@ -44,6 +44,11 @@ BUFFER_TIMEOUT = float(os.getenv('BUFFER_TIMEOUT', '1.5'))  # Segundos para acum
 # Previene que comandos maliciosos bloqueen el bot indefinidamente
 COMMAND_TIMEOUT = float(os.getenv('COMMAND_TIMEOUT', '300'))  # Por defecto 5 minutos
 
+# SEGURIDAD: Rate limiting para prevenir spam/DoS
+# Máximo número de requests permitidas por ventana de tiempo
+RATE_LIMIT_REQUESTS = int(os.getenv('RATE_LIMIT_REQUESTS', '10'))  # Por defecto 10 requests
+RATE_LIMIT_WINDOW = float(os.getenv('RATE_LIMIT_WINDOW', '60'))  # Por defecto 60 segundos (1 minuto)
+
 # Configuración de transcripción de voz
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '').strip()  # API key de OpenAI para Whisper
 USE_WHISPER_API = os.getenv('USE_WHISPER_API', 'true').lower() == 'true'  # Usar API o modelo local
@@ -76,6 +81,10 @@ user_sessions = {}
 
 # Almacenar procesos activos por usuario (para modo interactivo)
 active_processes = {}
+
+# SEGURIDAD: Rate limiting - rastrear timestamps de requests por usuario
+# Estructura: {user_id: [timestamp1, timestamp2, ...]}
+rate_limit_tracker = {}
 
 
 def remove_ansi_codes(text: str) -> str:
@@ -326,6 +335,45 @@ def is_user_authorized(user_id: int) -> bool:
         return True
     
     return user_id in ALLOWED_USER_IDS
+
+
+def check_rate_limit(user_id: int) -> tuple[bool, float]:
+    """
+    Verifica si un usuario ha excedido el límite de rate limiting.
+    
+    Args:
+        user_id: ID del usuario de Telegram
+        
+    Returns:
+        Tupla (is_allowed, time_until_reset)
+        - is_allowed: True si el usuario puede hacer la request, False si excedió el límite
+        - time_until_reset: Segundos hasta que se resetee la ventana (0 si está permitido)
+    """
+    import time
+    current_time = time.time()
+    
+    # Limpiar timestamps antiguos (fuera de la ventana)
+    if user_id in rate_limit_tracker:
+        # Mantener solo timestamps dentro de la ventana
+        rate_limit_tracker[user_id] = [
+            ts for ts in rate_limit_tracker[user_id]
+            if current_time - ts < RATE_LIMIT_WINDOW
+        ]
+    else:
+        rate_limit_tracker[user_id] = []
+    
+    # Verificar si excedió el límite
+    request_count = len(rate_limit_tracker[user_id])
+    
+    if request_count >= RATE_LIMIT_REQUESTS:
+        # Calcular tiempo hasta que expire el timestamp más antiguo
+        oldest_timestamp = min(rate_limit_tracker[user_id])
+        time_until_reset = RATE_LIMIT_WINDOW - (current_time - oldest_timestamp)
+        return False, max(0, time_until_reset)
+    
+    # Registrar esta request
+    rate_limit_tracker[user_id].append(current_time)
+    return True, 0
 
 
 async def transcribe_voice_message(voice_file_path: str) -> Optional[str]:
@@ -590,6 +638,19 @@ async def handle_voice_message(update: Update, context: ContextTypes.DEFAULT_TYP
         )
         return
     
+    # SEGURIDAD: Verificar rate limiting
+    is_allowed, time_until_reset = check_rate_limit(user_id)
+    if not is_allowed:
+        logger.warning(f"[SEGURIDAD] Usuario {user_id} (@{username}) excedió rate limit. Esperar {time_until_reset:.1f}s")
+        await update.message.reply_text(
+            f"⏱️ *Rate limit excedido*\n\n"
+            f"Has enviado demasiadas solicitudes en poco tiempo.\n"
+            f"Por favor espera {int(time_until_reset)} segundos antes de intentar de nuevo.\n\n"
+            f"Límite: {RATE_LIMIT_REQUESTS} requests por {int(RATE_LIMIT_WINDOW)} segundos.",
+            parse_mode='Markdown'
+        )
+        return
+    
     # Verificar disponibilidad de OpenAI
     if not OPENAI_AVAILABLE:
         logger.error(f"[Usuario {user_id}] OpenAI no está instalado")
@@ -791,6 +852,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "❌ *Acceso denegado*\n\n"
             "No estás autorizado para usar este bot.\n"
             "Contacta al administrador para obtener acceso.",
+            parse_mode='Markdown'
+        )
+        return
+    
+    # SEGURIDAD: Verificar rate limiting
+    is_allowed, time_until_reset = check_rate_limit(user_id)
+    if not is_allowed:
+        logger.warning(f"[SEGURIDAD] Usuario {user_id} (@{username}) excedió rate limit. Esperar {time_until_reset:.1f}s")
+        await update.message.reply_text(
+            f"⏱️ *Rate limit excedido*\n\n"
+            f"Has enviado demasiadas solicitudes en poco tiempo.\n"
+            f"Por favor espera {int(time_until_reset)} segundos antes de intentar de nuevo.\n\n"
+            f"Límite: {RATE_LIMIT_REQUESTS} requests por {int(RATE_LIMIT_WINDOW)} segundos.",
             parse_mode='Markdown'
         )
         return
