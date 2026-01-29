@@ -467,72 +467,26 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     processing_msg = await update.message.reply_text("⏳ Procesando...")
     current_message = processing_msg
     
-    # Buffer inteligente para acumular salida
-    accumulated_output = []
-    buffer_lock = asyncio.Lock()
-    buffer_task = None
+    # Acumular toda la salida
+    all_output = []
+    has_received_output = False
     
     async def handle_output_chunk(text: str):
-        """Maneja cada fragmento de salida con buffer inteligente."""
-        nonlocal accumulated_output, buffer_task, current_message
+        """Maneja cada fragmento de salida."""
+        nonlocal all_output, has_received_output, current_message
         
-        async with buffer_lock:
-            accumulated_output.append(text)
-            
-            # Cancelar task anterior si existe
-            if buffer_task and not buffer_task.done():
-                buffer_task.cancel()
-            
-            # Programar envío después del timeout
-            async def send_buffered():
-                await asyncio.sleep(BUFFER_TIMEOUT)
-                nonlocal current_message, accumulated_output
-                async with buffer_lock:
-                    local_accumulated = accumulated_output.copy() if accumulated_output else []
-                    accumulated_output = []
-                    
-                    if local_accumulated:
-                        combined = ''.join(local_accumulated)
-                        
-                        if combined.strip():
-                            cleaned = remove_ansi_codes(combined)
-                            if cleaned.strip():
-                                # Dividir si es muy largo
-                                parts = split_message(cleaned)
-                                if parts:
-                                    try:
-                                        await current_message.edit_text(
-                                            parts[0],
-                                            parse_mode='Markdown'
-                                        )
-                                        # Enviar partes adicionales
-                                        for part in parts[1:]:
-                                            current_message = await update.message.reply_text(
-                                                part,
-                                                parse_mode='Markdown'
-                                            )
-                                    except Exception as e:
-                                        logger.error(f"[Usuario {user_id}] Error enviando mensaje: {e}")
-                                        # Si falla, crear nuevo mensaje
-                                        try:
-                                            current_message = await update.message.reply_text(
-                                                parts[0],
-                                                parse_mode='Markdown'
-                                            )
-                                            for part in parts[1:]:
-                                                current_message = await update.message.reply_text(
-                                                    part,
-                                                    parse_mode='Markdown'
-                                                )
-                                        except Exception as e2:
-                                            logger.error(f"[Usuario {user_id}] Error crítico enviando mensaje: {e2}")
-            
-            buffer_task = asyncio.create_task(send_buffered())
+        if text.strip():
+            has_received_output = True
+            all_output.append(text)
+            logger.debug(f"[Usuario {user_id}] Salida recibida: {text[:100]}...")
     
     async def handle_error_chunk(text: str):
         """Maneja fragmentos de error."""
-        logger.warning(f"[Usuario {user_id}] Error recibido: {text[:200]}")
-        # Los errores se mostrarán al final
+        nonlocal all_output, has_received_output
+        if text.strip():
+            has_received_output = True
+            logger.warning(f"[Usuario {user_id}] Error recibido: {text[:200]}")
+            all_output.append(f"⚠️ Error: {text}\n")
     
     # Ejecutar comando con streaming
     executor = ClaudeCodeExecutor()
@@ -547,51 +501,45 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             handle_error_chunk
         )
         
-        # Cancelar buffer task y enviar cualquier salida restante
-        async with buffer_lock:
-            if buffer_task and not buffer_task.done():
-                buffer_task.cancel()
-                try:
-                    await buffer_task
-                except (asyncio.CancelledError, Exception):
-                    pass
+        # Procesar y enviar toda la salida acumulada
+        if all_output:
+            combined = ''.join(all_output)
+            cleaned = remove_ansi_codes(combined)
             
-            if accumulated_output:
-                combined = ''.join(accumulated_output)
-                accumulated_output = []
-                
-                if combined.strip():
-                    cleaned = remove_ansi_codes(combined)
-                    if cleaned.strip():
-                        parts = split_message(cleaned)
-                        if parts:
-                            try:
-                                await current_message.edit_text(
-                                    parts[0],
-                                    parse_mode='Markdown'
-                                )
-                                for part in parts[1:]:
-                                    await update.message.reply_text(part, parse_mode='Markdown')
-                            except Exception as e:
-                                logger.error(f"[Usuario {user_id}] Error enviando salida final: {e}")
+            if cleaned.strip():
+                parts = split_message(cleaned)
+                if parts:
+                    try:
+                        await current_message.edit_text(
+                            parts[0],
+                            parse_mode='Markdown'
+                        )
+                        for part in parts[1:]:
+                            await update.message.reply_text(part, parse_mode='Markdown')
+                    except Exception as e:
+                        logger.error(f"[Usuario {user_id}] Error enviando mensaje: {e}")
+                        # Si falla edit, crear nuevo mensaje
+                        try:
+                            await update.message.reply_text(parts[0], parse_mode='Markdown')
+                            for part in parts[1:]:
+                                await update.message.reply_text(part, parse_mode='Markdown')
+                        except Exception as e2:
+                            logger.error(f"[Usuario {user_id}] Error crítico enviando mensaje: {e2}")
         
-        # Mostrar resultado final
+        # Mostrar resultado final solo si no hubo salida
         if not result['success']:
             error_msg = f"❌ *Error ejecutando comando (código: {result['returncode']})*"
-            try:
-                await current_message.edit_text(error_msg, parse_mode='Markdown')
-            except Exception:
-                await update.message.reply_text(error_msg, parse_mode='Markdown')
-        else:
-            # Verificar si hubo salida antes de mostrar mensaje de éxito
-            async with buffer_lock:
-                has_output = bool(accumulated_output)
-            if not has_output:
+            if not has_received_output:
                 try:
-                    await current_message.edit_text("✅ Comando ejecutado exitosamente.", parse_mode='Markdown')
-                except Exception as e:
-                    logger.debug(f"[Usuario {user_id}] No se pudo editar mensaje de éxito: {e}")
-                    pass
+                    await current_message.edit_text(error_msg, parse_mode='Markdown')
+                except Exception:
+                    await update.message.reply_text(error_msg, parse_mode='Markdown')
+        elif not has_received_output:
+            # Solo mostrar éxito si no hubo ninguna salida
+            try:
+                await current_message.edit_text("✅ Comando ejecutado exitosamente.", parse_mode='Markdown')
+            except Exception as e:
+                logger.debug(f"[Usuario {user_id}] No se pudo editar mensaje de éxito: {e}")
         
         # Marcar que el usuario tiene una sesión activa
         if result['success']:
