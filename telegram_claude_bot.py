@@ -9,10 +9,16 @@ import subprocess
 import logging
 import asyncio
 import re
+import tempfile
 from typing import Optional, Callable
 from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
+try:
+    from openai import OpenAI
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
 
 # Cargar variables de entorno
 load_dotenv()
@@ -24,12 +30,26 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Verificar disponibilidad de OpenAI (ya se verificó arriba, solo loguear si falta)
+if not OPENAI_AVAILABLE:
+    logger.warning("OpenAI no está instalado. La transcripción de voz no funcionará. Instala con: pip install openai")
+
 # Variables de configuración
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 CLAUDE_CLI_PATH = os.getenv('CLAUDE_CLI_PATH', 'claude')  # Ruta al ejecutable de Claude CLI
 WORKSPACE_PATH = os.getenv('WORKSPACE_PATH', os.getcwd())  # Directorio de trabajo
 MAX_MESSAGE_LENGTH = 4096  # Límite de Telegram
 BUFFER_TIMEOUT = float(os.getenv('BUFFER_TIMEOUT', '1.5'))  # Segundos para acumular salida antes de enviar
+
+# Configuración de transcripción de voz
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '').strip()  # API key de OpenAI para Whisper
+USE_WHISPER_API = os.getenv('USE_WHISPER_API', 'true').lower() == 'true'  # Usar API o modelo local
+
+# Log inicial de configuración
+if OPENAI_API_KEY:
+    logger.info(f"OpenAI API key configurada: {OPENAI_API_KEY[:10]}...{OPENAI_API_KEY[-4:]}")
+else:
+    logger.warning("OPENAI_API_KEY no configurada. La transcripción de voz no funcionará.")
 
 # Herramientas permitidas automáticamente (para MCPs y herramientas sin prompts)
 # Por defecto permite todas las herramientas. Puedes restringir con: "Read,Edit,Bash"
@@ -277,6 +297,79 @@ def is_user_authorized(user_id: int) -> bool:
     return user_id in ALLOWED_USER_IDS
 
 
+async def transcribe_voice_message(voice_file_path: str) -> Optional[str]:
+    """
+    Transcribe un archivo de audio a texto usando OpenAI Whisper API.
+    
+    Args:
+        voice_file_path: Ruta al archivo de audio
+        
+    Returns:
+        Texto transcrito o None si hay error
+    """
+    if not OPENAI_AVAILABLE:
+        logger.error("OpenAI no está disponible. Instala: pip install openai")
+        return None
+    
+    if not OPENAI_API_KEY:
+        logger.error("OPENAI_API_KEY no está configurado en .env")
+        return None
+    
+    try:
+        logger.info(f"[Transcripción] Transcribiendo audio: {voice_file_path}")
+        client = OpenAI(api_key=OPENAI_API_KEY)
+        
+        # Obtener idioma de configuración o usar español por defecto
+        language = os.getenv('WHISPER_LANGUAGE', 'es')
+        if language.lower() == 'none' or language == '':
+            language = None
+        
+        with open(voice_file_path, 'rb') as audio_file:
+            transcript = client.audio.transcriptions.create(
+                model="whisper-1",
+                file=audio_file,
+                language=language
+            )
+        
+        text = transcript.text.strip()
+        logger.info(f"[Transcripción] Transcripción exitosa ({len(text)} caracteres): {text[:100]}...")
+        return text
+        
+    except Exception as e:
+        logger.error(f"[Transcripción] Error transcribiendo audio: {e}", exc_info=True)
+        return None
+
+
+async def download_voice_file(voice, context: ContextTypes.DEFAULT_TYPE) -> Optional[str]:
+    """
+    Descarga un archivo de voz de Telegram.
+    
+    Args:
+        voice: Objeto Voice de Telegram
+        context: Contexto del bot
+        
+    Returns:
+        Ruta al archivo descargado o None si hay error
+    """
+    try:
+        # Obtener el archivo
+        file = await context.bot.get_file(voice.file_id)
+        
+        # Crear archivo temporal
+        temp_dir = tempfile.gettempdir()
+        temp_file = os.path.join(temp_dir, f"voice_{voice.file_id}.ogg")
+        
+        # Descargar el archivo
+        await file.download_to_drive(temp_file)
+        logger.info(f"Archivo de voz descargado: {temp_file}")
+        
+        return temp_file
+        
+    except Exception as e:
+        logger.error(f"Error descargando archivo de voz: {e}", exc_info=True)
+        return None
+
+
 def split_message(text: str, max_length: int = MAX_MESSAGE_LENGTH) -> list:
     """Divide un mensaje largo en partes más pequeñas."""
     if len(text) <= max_length:
@@ -427,6 +520,16 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception:
         claude_status = "❌ No disponible"
     
+    # Verificar estado de transcripción de voz
+    whisper_status = "❌ No disponible"
+    if OPENAI_AVAILABLE:
+        if OPENAI_API_KEY:
+            whisper_status = f"✅ Configurado (key: {OPENAI_API_KEY[:10]}...{OPENAI_API_KEY[-4:]})"
+        else:
+            whisper_status = "⚠️ OpenAI instalado pero falta API key"
+    else:
+        whisper_status = "❌ OpenAI no instalado"
+    
     status_text = (
         "📊 *Estado del Bot*\n\n"
         f"*Claude CLI:* {claude_status}\n"
@@ -434,19 +537,20 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"*Workspace:* `{WORKSPACE_PATH}`\n"
         f"*Usuario:* {update.effective_user.first_name}\n"
         f"*Sesión activa:* {'Sí' if update.effective_user.id in user_sessions else 'No'}\n"
+        f"*Transcripción de voz:* {whisper_status}\n"
     )
     
     await update.message.reply_text(status_text, parse_mode='Markdown')
 
 
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Maneja mensajes de texto del usuario con lectura en tiempo real."""
+async def handle_voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Maneja mensajes de voz del usuario."""
     user_id = update.effective_user.id
     username = update.effective_user.username or "sin username"
     
     # Verificar autorización
     if not is_user_authorized(user_id):
-        logger.warning(f"[SEGURIDAD] Usuario no autorizado intentó enviar mensaje: {user_id} (@{username})")
+        logger.warning(f"[SEGURIDAD] Usuario no autorizado intentó enviar voz: {user_id} (@{username})")
         await update.message.reply_text(
             "❌ *Acceso denegado*\n\n"
             "No estás autorizado para usar este bot.\n"
@@ -455,13 +559,92 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
     
-    query = update.message.text
+    # Verificar disponibilidad de OpenAI
+    if not OPENAI_AVAILABLE:
+        logger.error(f"[Usuario {user_id}] OpenAI no está instalado")
+        await update.message.reply_text(
+            "❌ *Transcripción no disponible*\n\n"
+            "OpenAI no está instalado.\n"
+            "Instala con: `pip install openai`",
+            parse_mode='Markdown'
+        )
+        return
     
+    # Verificar API key
+    if not OPENAI_API_KEY or not OPENAI_API_KEY.strip():
+        logger.error(f"[Usuario {user_id}] OPENAI_API_KEY no configurada")
+        await update.message.reply_text(
+            "❌ *Transcripción no disponible*\n\n"
+            "OPENAI_API_KEY no está configurada en el archivo .env.\n"
+            "Agrega tu API key y reinicia el bot.",
+            parse_mode='Markdown'
+        )
+        return
+    
+    logger.info(f"[Usuario {user_id}] API key encontrada: {OPENAI_API_KEY[:10]}...{OPENAI_API_KEY[-4:]}")
+    
+    voice = update.message.voice
+    
+    # Mostrar que está procesando
+    processing_msg = await update.message.reply_text("🎤 Transcribiendo audio...")
+    
+    try:
+        # Descargar archivo de voz
+        voice_file_path = await download_voice_file(voice, context)
+        if not voice_file_path:
+            await processing_msg.edit_text("❌ Error descargando el archivo de voz.")
+            return
+        
+        # Transcribir audio
+        await processing_msg.edit_text("🔄 Procesando transcripción...")
+        transcribed_text = await transcribe_voice_message(voice_file_path)
+        
+        # Limpiar archivo temporal
+        try:
+            os.remove(voice_file_path)
+        except Exception as e:
+            logger.warning(f"No se pudo eliminar archivo temporal: {e}")
+        
+        if not transcribed_text:
+            await processing_msg.edit_text("❌ Error transcribiendo el audio. Intenta de nuevo.")
+            return
+        
+        # Mostrar transcripción
+        await processing_msg.edit_text(f"📝 *Transcripción:*\n\n{transcribed_text}")
+        
+        # Procesar el texto transcrito como si fuera un mensaje de texto normal
+        logger.info(f"[Usuario {user_id} (@{username})] Voz transcrita: {transcribed_text[:100]}...")
+        
+        # Procesar el texto transcrito directamente
+        await process_query(update, context, transcribed_text, user_id, username)
+        
+    except Exception as e:
+        logger.error(f"[Usuario {user_id}] Error procesando voz: {e}", exc_info=True)
+        await processing_msg.edit_text(f"❌ Error procesando voz: {str(e)}")
+
+
+async def process_query(
+    update: Update, 
+    context: ContextTypes.DEFAULT_TYPE, 
+    query: str, 
+    user_id: int, 
+    username: str
+):
+    """
+    Procesa una query (texto) y la ejecuta en Claude Code CLI.
+    
+    Args:
+        update: Update de Telegram
+        context: Contexto del bot
+        query: Texto a procesar
+        user_id: ID del usuario
+        username: Username del usuario
+    """
     if not query or not query.strip():
         await update.message.reply_text("Por favor envía un mensaje válido.")
         return
     
-    logger.info(f"[Usuario {user_id} (@{username})] Nuevo mensaje recibido: {query[:100]}...")
+    logger.info(f"[Usuario {user_id} (@{username})] Procesando query: {query[:100]}...")
     
     # Mostrar que está procesando
     processing_msg = await update.message.reply_text("⏳ Procesando...")
@@ -547,8 +730,34 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.info(f"[Usuario {user_id}] Sesión marcada como activa")
         
     except Exception as e:
-        logger.error(f"[Usuario {user_id}] Error en handle_message: {e}", exc_info=True)
+        logger.error(f"[Usuario {user_id}] Error en process_query: {e}", exc_info=True)
         await update.message.reply_text(f"❌ Error interno: {str(e)}")
+
+
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Maneja mensajes de texto del usuario con lectura en tiempo real."""
+    user_id = update.effective_user.id
+    username = update.effective_user.username or "sin username"
+    
+    # Verificar autorización
+    if not is_user_authorized(user_id):
+        logger.warning(f"[SEGURIDAD] Usuario no autorizado intentó enviar mensaje: {user_id} (@{username})")
+        await update.message.reply_text(
+            "❌ *Acceso denegado*\n\n"
+            "No estás autorizado para usar este bot.\n"
+            "Contacta al administrador para obtener acceso.",
+            parse_mode='Markdown'
+        )
+        return
+    
+    query = update.message.text
+    
+    if not query or not query.strip():
+        await update.message.reply_text("Por favor envía un mensaje válido.")
+        return
+    
+    # Procesar el mensaje usando la función compartida
+    await process_query(update, context, query, user_id, username)
 
 
 def main():
@@ -566,11 +775,37 @@ def main():
     application.add_handler(CommandHandler("new", new_conversation))
     application.add_handler(CommandHandler("status", status))
     application.add_handler(CommandHandler("myid", myid_command))
+    
+    # Handler para mensajes de voz (debe ir antes del handler de texto)
+    application.add_handler(MessageHandler(filters.VOICE, handle_voice_message))
+    
+    # Handler para mensajes de texto
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
-    # Iniciar bot
+    # Iniciar bot con manejo de errores de red
     logger.info("Bot iniciado. Presiona Ctrl+C para detener.")
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    
+    try:
+        application.run_polling(
+            allowed_updates=Update.ALL_TYPES,
+            drop_pending_updates=True,  # Ignorar actualizaciones pendientes al iniciar
+            close_loop=False  # No cerrar el loop al detener
+        )
+    except KeyboardInterrupt:
+        logger.info("Bot detenido por el usuario.")
+    except Exception as e:
+        logger.error(f"Error en el bot: {e}", exc_info=True)
+        logger.info("Reintentando conexión en 5 segundos...")
+        import time
+        time.sleep(5)
+        # Reintentar
+        try:
+            application.run_polling(
+                allowed_updates=Update.ALL_TYPES,
+                drop_pending_updates=True
+            )
+        except Exception as e2:
+            logger.error(f"Error crítico: {e2}. El bot no puede conectarse.")
 
 
 if __name__ == '__main__':

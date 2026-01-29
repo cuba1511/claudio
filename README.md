@@ -10,12 +10,14 @@ Este bot permite ejecutar comandos en tu instancia local de Claude Code CLI dire
 - ✅ Ejecución en tu workspace local
 - ✅ Manejo de mensajes largos
 - ✅ Comandos de gestión de sesiones
+- ✅ **Transcripción de notas de voz** usando OpenAI Whisper
 
 ## 📋 Requisitos Previos
 
 1. **Claude Code CLI instalado** - Asegúrate de tener Claude Code CLI instalado y disponible en tu PATH
 2. **Python 3.8+** - El bot está escrito en Python
 3. **Bot de Telegram** - Necesitas crear un bot en Telegram usando [@BotFather](https://t.me/BotFather)
+4. **OpenAI API Key** (opcional, para transcripción de voz) - Obtén tu API key en [platform.openai.com](https://platform.openai.com/api-keys)
 
 ## 🔧 Instalación
 
@@ -62,6 +64,7 @@ Este bot permite ejecutar comandos en tu instancia local de Claude Code CLI dire
    - `Ejecuta el script test.py`
    - `Usa el MCP de GitHub para listar mis repositorios`
    - `Busca errores en el código Python`
+   - **Envía notas de voz** 🎤 - El bot las transcribirá automáticamente y ejecutará el comando
 
 ## 📱 Comandos Disponibles
 
@@ -101,6 +104,8 @@ Bot: [Ejecuta el script y devuelve la salida]
 - `ALLOWED_USER_IDS` - IDs de usuarios autorizados separados por comas (requerido para seguridad)
 - `SKIP_PERMISSIONS` - Saltar checks de permisos para MCPs (por defecto: `true`)
 - `ALLOWED_TOOLS` - Herramientas permitidas (por defecto: `*`)
+- `OPENAI_API_KEY` - API key de OpenAI para transcripción de voz (opcional)
+- `WHISPER_LANGUAGE` - Idioma para transcripción: "es" (español), "en" (inglés), o None para auto-detectar
 
 ### Ejecutar como Servicio
 
