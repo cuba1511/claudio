@@ -8,8 +8,8 @@ import os
 import subprocess
 import logging
 import asyncio
-from pathlib import Path
-from typing import Optional
+import re
+from typing import Optional, Callable
 from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
@@ -29,6 +29,7 @@ TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 CLAUDE_CLI_PATH = os.getenv('CLAUDE_CLI_PATH', 'claude')  # Ruta al ejecutable de Claude CLI
 WORKSPACE_PATH = os.getenv('WORKSPACE_PATH', os.getcwd())  # Directorio de trabajo
 MAX_MESSAGE_LENGTH = 4096  # Límite de Telegram
+BUFFER_TIMEOUT = float(os.getenv('BUFFER_TIMEOUT', '1.5'))  # Segundos para acumular salida antes de enviar
 
 # Herramientas permitidas automáticamente (para MCPs y herramientas sin prompts)
 # Por defecto permite todas las herramientas. Puedes restringir con: "Read,Edit,Bash"
@@ -50,42 +51,113 @@ ALLOWED_USER_IDS = [
 # Almacenar conversaciones por usuario
 user_sessions = {}
 
+# Almacenar procesos activos por usuario (para modo interactivo)
+active_processes = {}
+
+
+def remove_ansi_codes(text: str) -> str:
+    """
+    Elimina códigos ANSI (colores y caracteres de escape) del texto.
+    
+    Args:
+        text: Texto que puede contener códigos ANSI
+        
+    Returns:
+        Texto limpio sin códigos ANSI
+    """
+    # Patrón para códigos ANSI (CSI sequences)
+    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+    return ansi_escape.sub('', text)
+
+
+class OutputBuffer:
+    """Buffer inteligente que acumula salida y la envía después de un timeout."""
+    
+    def __init__(self, callback: Callable, timeout: float = BUFFER_TIMEOUT):
+        self.buffer = ""
+        self.callback = callback
+        self.timeout = timeout
+        self.last_update = None
+        self.task = None
+        self.lock = asyncio.Lock()
+    
+    async def append(self, text: str):
+        """Agrega texto al buffer y programa el envío."""
+        async with self.lock:
+            self.buffer += text
+            self.last_update = asyncio.get_event_loop().time()
+            
+            # Cancelar task anterior si existe
+            if self.task and not self.task.done():
+                self.task.cancel()
+            
+            # Programar nuevo envío
+            self.task = asyncio.create_task(self._send_after_timeout())
+    
+    async def _send_after_timeout(self):
+        """Espera el timeout y envía el buffer."""
+        try:
+            await asyncio.sleep(self.timeout)
+            async with self.lock:
+                if self.buffer:
+                    text = self.buffer
+                    self.buffer = ""
+                    await self.callback(text)
+        except asyncio.CancelledError:
+            pass
+    
+    async def flush(self):
+        """Fuerza el envío inmediato del buffer."""
+        async with self.lock:
+            if self.task and not self.task.done():
+                self.task.cancel()
+            if self.buffer:
+                text = self.buffer
+                self.buffer = ""
+                await self.callback(text)
+
 
 class ClaudeCodeExecutor:
-    """Ejecutor de comandos Claude Code CLI."""
+    """Ejecutor de comandos Claude Code CLI con lectura en tiempo real."""
     
     def __init__(self, workspace_path: str = None):
         self.workspace_path = workspace_path or WORKSPACE_PATH
         self.claude_path = CLAUDE_CLI_PATH
-        
-    async def execute(self, query: str, user_id: int, continue_session: bool = False) -> dict:
+    
+    async def execute_streaming(
+        self, 
+        query: str, 
+        user_id: int, 
+        continue_session: bool,
+        output_callback: Callable[[str], None],
+        error_callback: Optional[Callable[[str], None]] = None
+    ) -> dict:
         """
-        Ejecuta un comando en Claude Code CLI.
+        Ejecuta un comando en Claude Code CLI con lectura en tiempo real.
         
         Args:
             query: El mensaje/comando a ejecutar
             user_id: ID del usuario para mantener sesiones separadas
             continue_session: Si True, continúa la conversación anterior usando -c
+            output_callback: Función async que se llama con cada fragmento de salida
+            error_callback: Función async opcional para manejar errores
             
         Returns:
-            dict con 'output', 'error', 'success'
+            dict con 'success', 'returncode'
         """
         try:
             # Construir comando
             cmd = [self.claude_path]
             
             # Si hay una sesión previa y queremos continuarla, usar -c (continue)
-            # que automáticamente continúa la conversación más reciente sin necesidad de session ID
             if continue_session and user_id in user_sessions:
                 cmd.append('-c')
+                logger.info(f"[Usuario {user_id}] Continuando sesión anterior")
             
             # Agregar flags para aprobar automáticamente herramientas/MCPs
-            # Los wildcards no funcionan con MCPs, así que usamos --dangerously-skip-permissions
-            # Esto es necesario porque -p (modo no interactivo) no puede mostrar prompts
             if SKIP_PERMISSIONS:
                 cmd.append('--dangerously-skip-permissions')
             elif ALLOWED_TOOLS and ALLOWED_TOOLS != '*':
-                # Solo usar --allowedTools si no estamos usando skip-permissions y no es wildcard
                 cmd.extend(['--allowedTools', ALLOWED_TOOLS])
             
             # Agregar -p para modo no interactivo y la query
@@ -95,9 +167,10 @@ class ClaudeCodeExecutor:
             env = os.environ.copy()
             env['PWD'] = self.workspace_path
             
-            logger.info(f"Ejecutando: {' '.join(cmd)}")
+            logger.info(f"[Usuario {user_id}] Ejecutando comando: {' '.join(cmd[:3])}... (query: {query[:50]}...)")
+            logger.debug(f"[Usuario {user_id}] Comando completo: {' '.join(cmd)}")
             
-            # Ejecutar comando
+            # Ejecutar comando con lectura en tiempo real
             process = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
@@ -106,32 +179,82 @@ class ClaudeCodeExecutor:
                 env=env
             )
             
-            stdout, stderr = await process.communicate()
+            # Leer stdout y stderr en paralelo
+            async def read_stream(stream, is_error=False):
+                buffer = b''
+                while True:
+                    chunk = await stream.read(1024)
+                    if not chunk:
+                        break
+                    buffer += chunk
+                    # Intentar decodificar líneas completas
+                    try:
+                        text = buffer.decode('utf-8', errors='replace')
+                        # Buscar líneas completas
+                        while '\n' in text:
+                            line, text = text.split('\n', 1)
+                            cleaned = remove_ansi_codes(line)
+                            if cleaned.strip():
+                                if is_error:
+                                    logger.warning(f"[Usuario {user_id}] STDERR: {cleaned[:100]}")
+                                    if error_callback:
+                                        await error_callback(cleaned)
+                                else:
+                                    logger.debug(f"[Usuario {user_id}] STDOUT: {cleaned[:100]}")
+                                    await output_callback(cleaned + '\n')
+                        buffer = text.encode('utf-8', errors='replace')
+                    except Exception as e:
+                        logger.error(f"[Usuario {user_id}] Error decodificando stream: {e}")
+                
+                # Procesar buffer restante
+                if buffer:
+                    try:
+                        text = buffer.decode('utf-8', errors='replace')
+                        cleaned = remove_ansi_codes(text)
+                        if cleaned.strip():
+                            if is_error:
+                                logger.warning(f"[Usuario {user_id}] STDERR final: {cleaned[:100]}")
+                                if error_callback:
+                                    await error_callback(cleaned)
+                            else:
+                                logger.debug(f"[Usuario {user_id}] STDOUT final: {cleaned[:100]}")
+                                await output_callback(cleaned)
+                    except Exception as e:
+                        logger.error(f"[Usuario {user_id}] Error decodificando buffer final: {e}")
             
-            # Decodificar output
-            output = stdout.decode('utf-8', errors='replace') if stdout else ''
-            error = stderr.decode('utf-8', errors='replace') if stderr else ''
+            # Leer ambos streams en paralelo
+            await asyncio.gather(
+                read_stream(process.stdout, is_error=False),
+                read_stream(process.stderr, is_error=True)
+            )
+            
+            # Esperar a que el proceso termine
+            returncode = await process.wait()
+            
+            success = returncode == 0
+            logger.info(f"[Usuario {user_id}] Comando completado con código: {returncode} (éxito: {success})")
             
             return {
-                'success': process.returncode == 0,
-                'output': output,
-                'error': error,
-                'returncode': process.returncode
+                'success': success,
+                'returncode': returncode
             }
             
         except FileNotFoundError:
+            error_msg = f'Claude CLI no encontrado en: {self.claude_path}'
+            logger.error(f"[Usuario {user_id}] {error_msg}")
+            if error_callback:
+                await error_callback(error_msg)
             return {
                 'success': False,
-                'output': '',
-                'error': f'Claude CLI no encontrado en: {self.claude_path}. Asegúrate de que está instalado y en PATH.',
                 'returncode': -1
             }
         except Exception as e:
-            logger.error(f"Error ejecutando comando: {e}", exc_info=True)
+            error_msg = f'Error ejecutando comando: {str(e)}'
+            logger.error(f"[Usuario {user_id}] {error_msg}", exc_info=True)
+            if error_callback:
+                await error_callback(error_msg)
             return {
                 'success': False,
-                'output': '',
-                'error': f'Error ejecutando comando: {str(e)}',
                 'returncode': -1
             }
 
@@ -301,7 +424,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         claude_status = "✅ Disponible"
         if result.stdout:
             claude_status += f" ({result.stdout.decode().strip()})"
-    except:
+    except Exception:
         claude_status = "❌ No disponible"
     
     status_text = (
@@ -317,12 +440,13 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Maneja mensajes de texto del usuario."""
+    """Maneja mensajes de texto del usuario con lectura en tiempo real."""
     user_id = update.effective_user.id
+    username = update.effective_user.username or "sin username"
     
     # Verificar autorización
     if not is_user_authorized(user_id):
-        logger.warning(f"Usuario no autorizado intentó enviar mensaje: {user_id}")
+        logger.warning(f"[SEGURIDAD] Usuario no autorizado intentó enviar mensaje: {user_id} (@{username})")
         await update.message.reply_text(
             "❌ *Acceso denegado*\n\n"
             "No estás autorizado para usar este bot.\n"
@@ -337,43 +461,146 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Por favor envía un mensaje válido.")
         return
     
+    logger.info(f"[Usuario {user_id} (@{username})] Nuevo mensaje recibido: {query[:100]}...")
+    
     # Mostrar que está procesando
     processing_msg = await update.message.reply_text("⏳ Procesando...")
+    current_message = processing_msg
     
-    # Ejecutar comando
+    # Buffer inteligente para acumular salida
+    accumulated_output = []
+    buffer_lock = asyncio.Lock()
+    buffer_task = None
+    
+    async def handle_output_chunk(text: str):
+        """Maneja cada fragmento de salida con buffer inteligente."""
+        nonlocal accumulated_output, buffer_task, current_message
+        
+        async with buffer_lock:
+            accumulated_output.append(text)
+            
+            # Cancelar task anterior si existe
+            if buffer_task and not buffer_task.done():
+                buffer_task.cancel()
+            
+            # Programar envío después del timeout
+            async def send_buffered():
+                await asyncio.sleep(BUFFER_TIMEOUT)
+                nonlocal current_message, accumulated_output
+                async with buffer_lock:
+                    local_accumulated = accumulated_output.copy() if accumulated_output else []
+                    accumulated_output = []
+                    
+                    if local_accumulated:
+                        combined = ''.join(local_accumulated)
+                        
+                        if combined.strip():
+                            cleaned = remove_ansi_codes(combined)
+                            if cleaned.strip():
+                                # Dividir si es muy largo
+                                parts = split_message(cleaned)
+                                if parts:
+                                    try:
+                                        await current_message.edit_text(
+                                            parts[0],
+                                            parse_mode='Markdown'
+                                        )
+                                        # Enviar partes adicionales
+                                        for part in parts[1:]:
+                                            current_message = await update.message.reply_text(
+                                                part,
+                                                parse_mode='Markdown'
+                                            )
+                                    except Exception as e:
+                                        logger.error(f"[Usuario {user_id}] Error enviando mensaje: {e}")
+                                        # Si falla, crear nuevo mensaje
+                                        try:
+                                            current_message = await update.message.reply_text(
+                                                parts[0],
+                                                parse_mode='Markdown'
+                                            )
+                                            for part in parts[1:]:
+                                                current_message = await update.message.reply_text(
+                                                    part,
+                                                    parse_mode='Markdown'
+                                                )
+                                        except Exception as e2:
+                                            logger.error(f"[Usuario {user_id}] Error crítico enviando mensaje: {e2}")
+            
+            buffer_task = asyncio.create_task(send_buffered())
+    
+    async def handle_error_chunk(text: str):
+        """Maneja fragmentos de error."""
+        logger.warning(f"[Usuario {user_id}] Error recibido: {text[:200]}")
+        # Los errores se mostrarán al final
+    
+    # Ejecutar comando con streaming
     executor = ClaudeCodeExecutor()
     continue_session = user_id in user_sessions
-    result = await executor.execute(query, user_id, continue_session=continue_session)
     
-    # Preparar respuesta
-    if result['success']:
-        response = result['output'] or "✅ Comando ejecutado exitosamente (sin output)."
-        
-        # Si hay errores pero también output, incluirlos
-        if result['error']:
-            response = f"{response}\n\n⚠️ *Warnings:*\n```\n{result['error']}\n```"
-    else:
-        response = f"❌ *Error ejecutando comando:*\n```\n{result['error']}\n```"
-        if result['output']:
-            response += f"\n\n*Output parcial:*\n```\n{result['output']}\n```"
-    
-    # Dividir mensaje si es muy largo
-    message_parts = split_message(response)
-    
-    # Enviar primera parte editando el mensaje de procesamiento
-    if message_parts:
-        await processing_msg.edit_text(
-            message_parts[0],
-            parse_mode='Markdown'
+    try:
+        result = await executor.execute_streaming(
+            query,
+            user_id,
+            continue_session,
+            handle_output_chunk,
+            handle_error_chunk
         )
         
-        # Enviar partes adicionales si existen
-        for part in message_parts[1:]:
-            await update.message.reply_text(part, parse_mode='Markdown')
-    
-    # Marcar que el usuario tiene una sesión activa (para usar -c en próximos mensajes)
-    if result['success']:
-        user_sessions[user_id] = True
+        # Cancelar buffer task y enviar cualquier salida restante
+        async with buffer_lock:
+            if buffer_task and not buffer_task.done():
+                buffer_task.cancel()
+                try:
+                    await buffer_task
+                except (asyncio.CancelledError, Exception):
+                    pass
+            
+            if accumulated_output:
+                combined = ''.join(accumulated_output)
+                accumulated_output = []
+                
+                if combined.strip():
+                    cleaned = remove_ansi_codes(combined)
+                    if cleaned.strip():
+                        parts = split_message(cleaned)
+                        if parts:
+                            try:
+                                await current_message.edit_text(
+                                    parts[0],
+                                    parse_mode='Markdown'
+                                )
+                                for part in parts[1:]:
+                                    await update.message.reply_text(part, parse_mode='Markdown')
+                            except Exception as e:
+                                logger.error(f"[Usuario {user_id}] Error enviando salida final: {e}")
+        
+        # Mostrar resultado final
+        if not result['success']:
+            error_msg = f"❌ *Error ejecutando comando (código: {result['returncode']})*"
+            try:
+                await current_message.edit_text(error_msg, parse_mode='Markdown')
+            except Exception:
+                await update.message.reply_text(error_msg, parse_mode='Markdown')
+        else:
+            # Verificar si hubo salida antes de mostrar mensaje de éxito
+            async with buffer_lock:
+                has_output = bool(accumulated_output)
+            if not has_output:
+                try:
+                    await current_message.edit_text("✅ Comando ejecutado exitosamente.", parse_mode='Markdown')
+                except Exception as e:
+                    logger.debug(f"[Usuario {user_id}] No se pudo editar mensaje de éxito: {e}")
+                    pass
+        
+        # Marcar que el usuario tiene una sesión activa
+        if result['success']:
+            user_sessions[user_id] = True
+            logger.info(f"[Usuario {user_id}] Sesión marcada como activa")
+        
+    except Exception as e:
+        logger.error(f"[Usuario {user_id}] Error en handle_message: {e}", exc_info=True)
+        await update.message.reply_text(f"❌ Error interno: {str(e)}")
 
 
 def main():
