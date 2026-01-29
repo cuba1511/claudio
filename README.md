@@ -69,6 +69,7 @@ Este bot permite ejecutar comandos en tu instancia local de Claude Code CLI dire
 - `/help` - Muestra ayuda detallada
 - `/new` - Inicia una nueva conversación (limpia el contexto)
 - `/status` - Muestra el estado del bot y configuración
+- `/myid` - Muestra tu ID de usuario (útil para configurar seguridad)
 
 ## 🔍 Ejemplos de Uso
 
@@ -97,6 +98,9 @@ Bot: [Ejecuta el script y devuelve la salida]
 - `TELEGRAM_BOT_TOKEN` - Token del bot de Telegram (requerido)
 - `CLAUDE_CLI_PATH` - Ruta al ejecutable de Claude CLI (opcional, por defecto: `claude`)
 - `WORKSPACE_PATH` - Directorio donde se ejecutan los comandos (opcional, por defecto: directorio actual)
+- `ALLOWED_USER_IDS` - IDs de usuarios autorizados separados por comas (requerido para seguridad)
+- `SKIP_PERMISSIONS` - Saltar checks de permisos para MCPs (por defecto: `true`)
+- `ALLOWED_TOOLS` - Herramientas permitidas (por defecto: `*`)
 
 ### Ejecutar como Servicio
 
@@ -112,6 +116,29 @@ python telegram_claude_bot.py
 # Presiona Ctrl+A luego D para detach
 ```
 
+## 🔒 Seguridad
+
+El bot incluye un sistema de autenticación basado en IDs de usuario de Telegram:
+
+1. **Obtén tu ID de usuario:**
+   - Inicia el bot y envía `/myid`
+   - El bot te mostrará tu ID de usuario único
+
+2. **Configura usuarios autorizados:**
+   - Edita el archivo `.env`
+   - Agrega tu ID a `ALLOWED_USER_IDS`:
+     ```
+     ALLOWED_USER_IDS=123456789
+     ```
+   - Para múltiples usuarios, sepáralos con comas:
+     ```
+     ALLOWED_USER_IDS=123456789,987654321
+     ```
+
+3. **Reinicia el bot** para aplicar los cambios
+
+⚠️ **IMPORTANTE:** Si `ALLOWED_USER_IDS` está vacío, CUALQUIER usuario puede usar el bot. Esto es inseguro y NO recomendado.
+
 ## 🛠️ Solución de Problemas
 
 ### El bot no responde
@@ -126,6 +153,11 @@ python telegram_claude_bot.py
 ### Los MCPs no funcionan
 - Asegúrate de que los MCPs estén configurados en tu instalación local de Claude Code
 - Los MCPs funcionan igual que en la terminal local
+
+### "Acceso denegado" al usar el bot
+- Verifica que tu ID de usuario esté en `ALLOWED_USER_IDS` en el archivo `.env`
+- Usa `/myid` para obtener tu ID de usuario
+- Reinicia el bot después de agregar tu ID
 
 ## 📝 Notas
 

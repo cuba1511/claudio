@@ -38,6 +38,15 @@ ALLOWED_TOOLS = os.getenv('ALLOWED_TOOLS', '*')  # '*' permite todas las herrami
 # Esto es necesario porque los wildcards no funcionan con MCPs y -p no puede mostrar prompts
 SKIP_PERMISSIONS = os.getenv('SKIP_PERMISSIONS', 'true').lower() == 'true'
 
+# Seguridad: Lista de IDs de usuario de Telegram autorizados
+# Formato: "123456789,987654321" o un solo ID: "123456789"
+# Si está vacío, cualquier usuario puede usar el bot (NO RECOMENDADO)
+ALLOWED_USER_IDS = [
+    int(uid.strip()) 
+    for uid in os.getenv('ALLOWED_USER_IDS', '').split(',') 
+    if uid.strip()
+]
+
 # Almacenar conversaciones por usuario
 user_sessions = {}
 
@@ -127,6 +136,24 @@ class ClaudeCodeExecutor:
             }
 
 
+def is_user_authorized(user_id: int) -> bool:
+    """
+    Verifica si un usuario está autorizado para usar el bot.
+    
+    Args:
+        user_id: ID del usuario de Telegram
+        
+    Returns:
+        True si el usuario está autorizado, False en caso contrario
+    """
+    # Si no hay lista de usuarios permitidos, permitir a todos (modo inseguro)
+    if not ALLOWED_USER_IDS:
+        logger.warning(f"ALLOWED_USER_IDS no configurado. Permitiendo acceso a usuario {user_id}")
+        return True
+    
+    return user_id in ALLOWED_USER_IDS
+
+
 def split_message(text: str, max_length: int = MAX_MESSAGE_LENGTH) -> list:
     """Divide un mensaje largo en partes más pequeñas."""
     if len(text) <= max_length:
@@ -153,21 +180,68 @@ def split_message(text: str, max_length: int = MAX_MESSAGE_LENGTH) -> list:
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Maneja el comando /start."""
+    user_id = update.effective_user.id
+    
+    # Verificar autorización
+    if not is_user_authorized(user_id):
+        logger.warning(f"Usuario no autorizado intentó usar el bot: {user_id} (@{update.effective_user.username})")
+        await update.message.reply_text(
+            "❌ *Acceso denegado*\n\n"
+            "No estás autorizado para usar este bot.\n"
+            "Contacta al administrador para obtener acceso.",
+            parse_mode='Markdown'
+        )
+        return
+    
+    # Mostrar ID del usuario para facilitar la configuración inicial
+    user_info = f"*Tu ID de usuario:* `{user_id}`\n\n"
+    if not ALLOWED_USER_IDS:
+        user_info += "⚠️ *Advertencia:* No hay usuarios autorizados configurados. Cualquiera puede usar el bot.\n\n"
+    
     welcome_message = (
         "🤖 *Bot Claude Code CLI*\n\n"
+        f"{user_info}"
         "Envía mensajes aquí y se ejecutarán en tu instancia local de Claude Code CLI.\n\n"
         "Comandos disponibles:\n"
         "/start - Muestra este mensaje\n"
         "/help - Muestra ayuda detallada\n"
         "/new - Inicia una nueva conversación\n"
-        "/status - Muestra el estado del bot\n\n"
+        "/status - Muestra el estado del bot\n"
+        "/myid - Muestra tu ID de usuario\n\n"
         "Simplemente escribe tu mensaje y se ejecutará en Claude Code."
     )
     await update.message.reply_text(welcome_message, parse_mode='Markdown')
 
 
+async def myid_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Muestra el ID del usuario para facilitar la configuración."""
+    user_id = update.effective_user.id
+    username = update.effective_user.username or "sin username"
+    first_name = update.effective_user.first_name or "Usuario"
+    
+    is_authorized = is_user_authorized(user_id)
+    auth_status = "✅ Autorizado" if is_authorized else "❌ No autorizado"
+    
+    message = (
+        f"👤 *Información de Usuario*\n\n"
+        f"*Nombre:* {first_name}\n"
+        f"*Username:* @{username}\n"
+        f"*ID:* `{user_id}`\n"
+        f"*Estado:* {auth_status}\n\n"
+        f"Para autorizar este usuario, agrega este ID a `ALLOWED_USER_IDS` en tu archivo `.env`:\n"
+        f"`ALLOWED_USER_IDS={user_id}`"
+    )
+    
+    await update.message.reply_text(message, parse_mode='Markdown')
+
+
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Maneja el comando /help."""
+    # Verificar autorización
+    if not is_user_authorized(update.effective_user.id):
+        await update.message.reply_text("❌ No estás autorizado para usar este bot.")
+        return
+    
     help_text = (
         "📚 *Ayuda - Bot Claude Code CLI*\n\n"
         "*Uso básico:*\n"
@@ -193,6 +267,11 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def new_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Inicia una nueva conversación."""
+    # Verificar autorización
+    if not is_user_authorized(update.effective_user.id):
+        await update.message.reply_text("❌ No estás autorizado para usar este bot.")
+        return
+    
     user_id = update.effective_user.id
     if user_id in user_sessions:
         del user_sessions[user_id]
@@ -204,6 +283,11 @@ async def new_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Muestra el estado del bot."""
+    # Verificar autorización
+    if not is_user_authorized(update.effective_user.id):
+        await update.message.reply_text("❌ No estás autorizado para usar este bot.")
+        return
+    
     executor = ClaudeCodeExecutor()
     
     # Verificar si Claude CLI está disponible
@@ -235,6 +319,18 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Maneja mensajes de texto del usuario."""
     user_id = update.effective_user.id
+    
+    # Verificar autorización
+    if not is_user_authorized(user_id):
+        logger.warning(f"Usuario no autorizado intentó enviar mensaje: {user_id}")
+        await update.message.reply_text(
+            "❌ *Acceso denegado*\n\n"
+            "No estás autorizado para usar este bot.\n"
+            "Contacta al administrador para obtener acceso.",
+            parse_mode='Markdown'
+        )
+        return
+    
     query = update.message.text
     
     if not query or not query.strip():
@@ -294,6 +390,7 @@ def main():
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("new", new_conversation))
     application.add_handler(CommandHandler("status", status))
+    application.add_handler(CommandHandler("myid", myid_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
     # Iniciar bot
