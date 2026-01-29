@@ -48,19 +48,22 @@ class ClaudeCodeExecutor:
         Args:
             query: El mensaje/comando a ejecutar
             user_id: ID del usuario para mantener sesiones separadas
-            continue_session: Si True, continúa la conversación anterior
+            continue_session: Si True, continúa la conversación anterior usando -c
             
         Returns:
             dict con 'output', 'error', 'success'
         """
         try:
             # Construir comando
-            cmd = [self.claude_path, '-p', query]
+            cmd = [self.claude_path]
             
-            # Si hay una sesión previa y queremos continuarla
+            # Si hay una sesión previa y queremos continuarla, usar -c (continue)
+            # que automáticamente continúa la conversación más reciente sin necesidad de session ID
             if continue_session and user_id in user_sessions:
-                session_id = user_sessions[user_id]
-                cmd.extend(['-r', session_id])
+                cmd.append('-c')
+            
+            # Agregar -p para modo no interactivo y la query
+            cmd.extend(['-p', query])
             
             # Configurar entorno
             env = os.environ.copy()
@@ -82,11 +85,6 @@ class ClaudeCodeExecutor:
             # Decodificar output
             output = stdout.decode('utf-8', errors='replace') if stdout else ''
             error = stderr.decode('utf-8', errors='replace') if stderr else ''
-            
-            # Intentar extraer session ID del output si existe
-            if output and 'session' in output.lower():
-                # Aquí podrías parsear el session ID si Claude lo devuelve
-                pass
             
             return {
                 'success': process.returncode == 0,
@@ -260,9 +258,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for part in message_parts[1:]:
             await update.message.reply_text(part, parse_mode='Markdown')
     
-    # Marcar que el usuario tiene una sesión activa
+    # Marcar que el usuario tiene una sesión activa (para usar -c en próximos mensajes)
     if result['success']:
-        user_sessions[user_id] = f"session_{user_id}"
+        user_sessions[user_id] = True
 
 
 def main():
