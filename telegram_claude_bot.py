@@ -30,6 +30,14 @@ CLAUDE_CLI_PATH = os.getenv('CLAUDE_CLI_PATH', 'claude')  # Ruta al ejecutable d
 WORKSPACE_PATH = os.getenv('WORKSPACE_PATH', os.getcwd())  # Directorio de trabajo
 MAX_MESSAGE_LENGTH = 4096  # Límite de Telegram
 
+# Herramientas permitidas automáticamente (para MCPs y herramientas sin prompts)
+# Por defecto permite todas las herramientas. Puedes restringir con: "Read,Edit,Bash"
+ALLOWED_TOOLS = os.getenv('ALLOWED_TOOLS', '*')  # '*' permite todas las herramientas
+
+# Usar --dangerously-skip-permissions para bypass todos los checks de permisos
+# Esto es necesario porque los wildcards no funcionan con MCPs y -p no puede mostrar prompts
+SKIP_PERMISSIONS = os.getenv('SKIP_PERMISSIONS', 'true').lower() == 'true'
+
 # Almacenar conversaciones por usuario
 user_sessions = {}
 
@@ -61,6 +69,15 @@ class ClaudeCodeExecutor:
             # que automáticamente continúa la conversación más reciente sin necesidad de session ID
             if continue_session and user_id in user_sessions:
                 cmd.append('-c')
+            
+            # Agregar flags para aprobar automáticamente herramientas/MCPs
+            # Los wildcards no funcionan con MCPs, así que usamos --dangerously-skip-permissions
+            # Esto es necesario porque -p (modo no interactivo) no puede mostrar prompts
+            if SKIP_PERMISSIONS:
+                cmd.append('--dangerously-skip-permissions')
+            elif ALLOWED_TOOLS and ALLOWED_TOOLS != '*':
+                # Solo usar --allowedTools si no estamos usando skip-permissions y no es wildcard
+                cmd.extend(['--allowedTools', ALLOWED_TOOLS])
             
             # Agregar -p para modo no interactivo y la query
             cmd.extend(['-p', query])
