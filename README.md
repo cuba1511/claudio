@@ -178,6 +178,10 @@ El bot incluye un sistema de autenticación basado en IDs de usuario de Telegram
 - Usar solo con usuarios de confianza
 - Considerar agregar autenticación adicional si es necesario
 
+## 🤝 Contribuciones
+
+Las contribuciones son bienvenidas. Si encuentras un bug o tienes una idea para mejorar el bot, abre un issue o envía un pull request.
+
 ## 📄 Licencia
 
 Este proyecto es de uso personal. Úsalo bajo tu propia responsabilidad.
