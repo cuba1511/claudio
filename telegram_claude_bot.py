@@ -10,6 +10,8 @@ import logging
 import asyncio
 import re
 import tempfile
+import sys
+import atexit
 from typing import Optional, Callable
 from dotenv import load_dotenv
 from telegram import Update
@@ -19,6 +21,18 @@ try:
     OPENAI_AVAILABLE = True
 except ImportError:
     OPENAI_AVAILABLE = False
+
+# File locking para prevenir múltiples instancias
+try:
+    import fcntl
+    HAS_FCNTL = True
+except ImportError:
+    HAS_FCNTL = False
+    try:
+        import msvcrt
+        HAS_MSVCRT = True
+    except ImportError:
+        HAS_MSVCRT = False
 
 # Cargar variables de entorno
 load_dotenv()
@@ -42,7 +56,7 @@ MAX_MESSAGE_LENGTH = 4096  # Límite de Telegram
 BUFFER_TIMEOUT = float(os.getenv('BUFFER_TIMEOUT', '1.5'))  # Segundos para acumular salida antes de enviar
 # SEGURIDAD: Timeout máximo para ejecución de comandos (en segundos)
 # Previene que comandos maliciosos bloqueen el bot indefinidamente
-COMMAND_TIMEOUT = float(os.getenv('COMMAND_TIMEOUT', '300'))  # Por defecto 5 minutos
+COMMAND_TIMEOUT = float(os.getenv('COMMAND_TIMEOUT', '1800'))  # Por defecto 30 minutos (1800 segundos)
 # SEGURIDAD: Longitud máxima de input para prevenir DoS por mensajes gigantes
 # Previene que usuarios envíen mensajes extremadamente largos que consuman recursos
 MAX_INPUT_LENGTH = int(os.getenv('MAX_INPUT_LENGTH', '10000'))  # Por defecto 10,000 caracteres
@@ -88,6 +102,79 @@ active_processes = {}
 # SEGURIDAD: Rate limiting - rastrear timestamps de requests por usuario
 # Estructura: {user_id: [timestamp1, timestamp2, ...]}
 rate_limit_tracker = {}
+
+# Lock file para prevenir múltiples instancias
+LOCK_FILE_PATH = os.path.join(tempfile.gettempdir(), 'telegram_claude_bot.lock')
+lock_file = None
+lock_file_handle = None
+
+
+def acquire_lock():
+    """
+    Adquiere un lock file para prevenir múltiples instancias del bot.
+    Retorna True si el lock fue adquirido exitosamente, False si otra instancia está corriendo.
+    """
+    global lock_file, lock_file_handle
+    
+    try:
+        lock_file_handle = open(LOCK_FILE_PATH, 'w')
+        lock_file_handle.write(str(os.getpid()))
+        lock_file_handle.flush()
+        
+        if HAS_FCNTL:
+            # Linux/Mac
+            fcntl.flock(lock_file_handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        elif HAS_MSVCRT:
+            # Windows
+            msvcrt.locking(lock_file_handle.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            # Fallback: verificar si el proceso del PID en el lock file sigue vivo
+            try:
+                with open(LOCK_FILE_PATH, 'r') as f:
+                    old_pid = int(f.read().strip())
+                # Verificar si el proceso existe
+                try:
+                    os.kill(old_pid, 0)  # Signal 0 solo verifica existencia
+                    logger.warning(f"Another instance may be running (PID: {old_pid})")
+                    lock_file_handle.close()
+                    return False
+                except ProcessLookupError:
+                    # Proceso no existe, podemos tomar el lock
+                    pass
+            except (FileNotFoundError, ValueError):
+                # Lock file no existe o está corrupto, podemos continuar
+                pass
+        
+        # Registrar función de cleanup
+        atexit.register(release_lock)
+        return True
+        
+    except (IOError, OSError) as e:
+        if lock_file_handle:
+            lock_file_handle.close()
+        logger.error(f"Could not acquire lock file: {e}")
+        logger.error("Another instance of the bot may be running.")
+        return False
+
+
+def release_lock():
+    """Libera el lock file al cerrar el bot."""
+    global lock_file_handle
+    
+    try:
+        if lock_file_handle:
+            if HAS_FCNTL:
+                fcntl.flock(lock_file_handle.fileno(), fcntl.LOCK_UN)
+            elif HAS_MSVCRT:
+                msvcrt.locking(lock_file_handle.fileno(), msvcrt.LK_UNLCK, 1)
+            lock_file_handle.close()
+        
+        if os.path.exists(LOCK_FILE_PATH):
+            os.remove(LOCK_FILE_PATH)
+            
+        logger.info("Lock file released.")
+    except Exception as e:
+        logger.debug(f"Error releasing lock: {e}")
 
 
 def remove_ansi_codes(text: str) -> str:
@@ -158,6 +245,20 @@ class ClaudeCodeExecutor:
     def __init__(self, workspace_path: str = None):
         self.workspace_path = workspace_path or WORKSPACE_PATH
         self.claude_path = CLAUDE_CLI_PATH
+        self.active_processes = []  # Track procesos activos para cleanup
+    
+    def cleanup_processes(self):
+        """Mata todos los procesos activos de Claude CLI."""
+        for process_info in self.active_processes[:]:
+            try:
+                pid, process = process_info
+                if process.returncode is None:  # Proceso aún corriendo
+                    logger.warning(f"Killing orphaned Claude CLI process (PID: {pid})")
+                    process.kill()
+                    process.wait()
+            except Exception as e:
+                logger.debug(f"Error cleaning up process: {e}")
+        self.active_processes.clear()
     
     async def execute_streaming(
         self, 
@@ -213,6 +314,10 @@ class ClaudeCodeExecutor:
                 cwd=self.workspace_path,
                 env=env
             )
+            
+            # Track proceso para cleanup
+            process_pid = process.pid
+            self.active_processes.append((process_pid, process))
             
             # Leer stdout y stderr en paralelo
             async def read_stream(stream, is_error=False):
@@ -276,6 +381,8 @@ class ClaudeCodeExecutor:
                 try:
                     process.kill()
                     await process.wait()
+                    # Remover de procesos activos
+                    self.active_processes = [p for p in self.active_processes if p[0] != process_pid]
                 except Exception as kill_error:
                     logger.error(f"[Usuario {user_id}] Error matando proceso: {kill_error}")
                 
@@ -296,6 +403,9 @@ class ClaudeCodeExecutor:
             
             success = returncode == 0
             logger.info(f"[Usuario {user_id}] Comando completado con código: {returncode} (éxito: {success})")
+            
+            # Remover de procesos activos
+            self.active_processes = [p for p in self.active_processes if p[0] != process_pid]
             
             return {
                 'success': success,
@@ -896,8 +1006,22 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def main():
     """Función principal."""
+    # Prevenir múltiples instancias
+    if not acquire_lock():
+        print("\n" + "="*70)
+        print("❌ ERROR: Otra instancia del bot está ejecutándose")
+        print("="*70)
+        print("Solo puede haber una instancia del bot ejecutándose a la vez.")
+        print("\nPara solucionarlo:")
+        print("1. Busca procesos con: ps aux | grep telegram_claude_bot")
+        print("2. Mata procesos duplicados con: kill <PID>")
+        print("3. O usa el script: ./kill_bot_processes.sh")
+        print("="*70 + "\n")
+        sys.exit(1)
+    
     if not TELEGRAM_BOT_TOKEN:
         logger.error("TELEGRAM_BOT_TOKEN no está configurado. Por favor configúralo en .env")
+        release_lock()
         return
     
     # SEGURIDAD: Validar que ALLOWED_USER_IDS esté configurado
@@ -918,9 +1042,13 @@ def main():
         print("2. Formato: ALLOWED_USER_IDS=123456789")
         print("3. Para múltiples usuarios: ALLOWED_USER_IDS=123456789,987654321")
         print("="*70 + "\n")
+        release_lock()
         return
     
     logger.info(f"✅ Seguridad: {len(ALLOWED_USER_IDS)} usuario(s) autorizado(s)")
+    
+    # Crear instancia global del executor para cleanup
+    global_executor = ClaudeCodeExecutor()
     
     # Crear aplicación
     application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
@@ -962,6 +1090,15 @@ def main():
             )
         except Exception as e2:
             logger.error(f"Error crítico: {e2}. El bot no puede conectarse.")
+    finally:
+        # Cleanup: matar procesos huérfanos de Claude CLI
+        try:
+            global_executor.cleanup_processes()
+        except Exception as e:
+            logger.debug(f"Error during cleanup: {e}")
+        
+        # Asegurar que el lock se libere siempre
+        release_lock()
 
 
 if __name__ == '__main__':
