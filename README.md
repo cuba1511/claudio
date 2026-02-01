@@ -2,30 +2,56 @@
 
 Asistente de productividad para el equipo de Product & Technology de PropHero.
 
+![Arquitectura de Claudio](./claudio.png)
+
 ## Qué es Claudio
 
 Claudio es un sistema de asistencia basado en Claude que integra múltiples herramientas (MCPs) para automatizar tareas de product management, desarrollo y comunicación.
+
+### Usuarios
+- **Product Manager** - Crea Initiatives, Epics, User Stories
+- **Engineer / Dev** - Ejecuta código, gestiona PRs, debugging
+
+### Canales de Entrada
+- **Slack** - Mensajes directos
+- **Terminal** - Claude Code CLI / Cursor
+- **WhatsApp** - Bot (próximamente)
+- **Telegram** - Bot móvil
+
+### Flujo de Trabajo
+```
+Definition → Initiative → Epic → User Story → Execution
+```
 
 ## Arquitectura
 
 | Componente | Rol | Ubicación |
 |------------|-----|-----------|
 | **Cerebro** | Instrucciones, contextos, guías | `docs/` |
-| **Manos** | MCPs (ClickUp, GitHub, Slack, Docs, Sheets) | `mcp/` |
-| **Bocas** | Canales de acceso (Telegram, Cursor) | `channels/` |
+| **Manos** | MCPs (ClickUp, GitHub, Slack, Docs, etc.) | `mcp/` |
+| **Bocas** | Canales de acceso (Telegram, Terminal) | `channels/` |
 
 ## MCPs Integrados
 
-- **ClickUp** - Product Management (Initiatives, Epics, User Stories)
-- **GitHub** - Código, PRs, Issues
-- **Slack** - Comunicación y notificaciones
-- **Google Docs** - Documentación y specs
-- **Google Sheets** - Datos y reportes
+| MCP | Propósito | Estado |
+|-----|-----------|--------|
+| **ClickUp** | Product Management (Initiatives, Epics, User Stories) | ✅ |
+| **GitHub** | Código, PRs, Issues | ✅ |
+| **Slack** | Comunicación y notificaciones | ✅ |
+| **Google Docs** | Documentación y specs | ✅ |
+| **Google Sheets** | Datos y reportes | ✅ |
+| **Granola** | Meeting notes, transcripciones | ✅ |
+| **Gmail** | Email | 🔜 |
+| **Slides** | Presentaciones | 🔜 |
 
 ## Canales de Acceso
 
-- **Cursor** - IDE con acceso a todos los MCPs
-- **Telegram** - Bot para acceso móvil
+| Canal | Descripción | Estado |
+|-------|-------------|--------|
+| **Terminal** | Claude Code CLI / Cursor IDE | ✅ |
+| **Telegram** | Bot para acceso móvil | ✅ |
+| **Slack** | Mensajes directos | 🔜 |
+| **WhatsApp** | Bot móvil | 🔜 |
 
 ## Quick Start
 
@@ -47,16 +73,17 @@ python bot.py
 
 ```
 claudio/
-├── CLAUDE.md           # Instrucciones para Claude
+├── CLAUDE.md              # Instrucciones para Claude (rules)
+├── claudio.png            # Diagrama de arquitectura
+├── kill_bot_processes.sh  # Utilidad para el bot
 ├── docs/
-│   ├── integrations/   # Guías por MCP
-│   └── workflows/      # Workflows multi-MCP
+│   ├── integrations/      # Guías por MCP
+│   └── workflows/         # Workflows multi-MCP
 ├── mcp/
-│   ├── cursor-config.json
-│   └── servers/
+│   ├── cursor-config.json # Config para Cursor
+│   └── servers/           # Servidores MCP
 └── channels/
-    ├── telegram/
-    └── cursor/
+    └── telegram/          # Bot de Telegram
 ```
 
 ## Documentación
