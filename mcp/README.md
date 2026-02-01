@@ -43,9 +43,6 @@ Configuración de Model Context Protocol (MCP) servers para Claudio.
 
 ## Servidores Custom
 
-Los servidores MCP custom están en `servers/`:
+Ver `servers/README.md` para documentación de servidores MCP custom.
 
-```
-servers/
-└── google-docs → symlink a mcp-servers/mcp-googledocs-server
-```
+El servidor de Google Docs corre desde `/Users/ignaciodelacuba/Dev/mcp-servers/mcp-googledocs-server/` (configurado en cursor-config.json).

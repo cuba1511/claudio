@@ -14,7 +14,7 @@ Servidores MCP utilizados por Claudio.
 ## Servidores Configurados
 
 ### Google Docs (Local)
-- **Ubicación**: `./google-docs` → symlink a `mcp-servers/mcp-googledocs-server`
+- **Ubicación**: `/Users/ignaciodelacuba/Dev/mcp-servers/mcp-googledocs-server/`
 - **Comando**: `node dist/server.js`
 - **Requiere**: OAuth setup con Google Cloud
 
@@ -40,7 +40,6 @@ Servidores MCP utilizados por Claudio.
 
 ## Agregar nuevo servidor
 
-1. Si es local, crear symlink en esta carpeta
+1. Agregar configuración a `../cursor-config.json` (para Cursor IDE)
 2. Agregar configuración a `~/.claude.json` (para Claude Code CLI)
-3. Agregar configuración a `~/.cursor/mcp.json` (para Cursor)
-4. Crear guía en `docs/integrations/{nombre}/guide.md`
+3. Crear guía en `docs/integrations/{nombre}/guide.md`

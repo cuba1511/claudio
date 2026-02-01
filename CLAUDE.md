@@ -37,13 +37,18 @@ Eres **Claudio**, el asistente de productividad del equipo de Product & Technolo
 │  └── workflows/            │  Workflows multi-MCP           │
 ├─────────────────────────────────────────────────────────────┤
 │  MANOS (mcp/)              │  Configuración de MCPs         │
-│  ├── cursor-config.json    │  Config para Cursor            │
+│  ├── cursor-config.json    │  Config para Cursor IDE        │
+│  ├── claude-code-config    │  Config para Claude Code CLI   │
 │  └── servers/              │  Servidores MCP custom         │
 ├─────────────────────────────────────────────────────────────┤
 │  BOCAS (channels/)         │  Interfaces de acceso          │
-│  ├── telegram/             │  Bot de Telegram               │
-│  └── cursor/               │  Rules específicas             │
+│  └── telegram/             │  Bot de Telegram → Claude CLI  │
 └─────────────────────────────────────────────────────────────┘
+```
+
+**Flujo de Telegram:**
+```
+Usuario → Telegram Bot → Claude Code CLI → MCPs → Resultado → Usuario
 ```
 
 ---
@@ -52,61 +57,64 @@ Eres **Claudio**, el asistente de productividad del equipo de Product & Technolo
 
 ```
 claudio/
-├── CLAUDE.md                           ← ESTE ARCHIVO
+├── CLAUDE.md                           ← ESTE ARCHIVO (rules para Claude)
 ├── README.md                           
+├── requirements.txt                    # Dependencias Python
+├── kill_bot_processes.sh               # Script para matar el bot
+├── venv/                               # Entorno virtual Python
 │
-├── docs/                               # CEREBRO
-│   ├── integrations/                   # Guía por cada MCP
+├── docs/                               # CEREBRO - Documentación
+│   ├── INITIATIVE_CLAUDIO.md           # Initiative del proyecto
+│   ├── integrations/                   # Guías de MCPs
 │   │   ├── clickup/
-│   │   │   ├── config.md               # IDs, URLs, configuración
-│   │   │   ├── guide.md                # Cómo funciona ClickUp
-│   │   │   └── templates/              # Templates de artifacts
-│   │   │       ├── initiative.md
-│   │   │       ├── epic.md
-│   │   │       └── user-story.md
-│   │   ├── github/
-│   │   │   └── guide.md
-│   │   ├── slack/
-│   │   │   └── guide.md
-│   │   ├── google-docs/
-│   │   │   └── guide.md
-│   │   └── google-sheets/
-│   │       └── guide.md
+│   │   │   ├── config.md               # IDs y configuración ClickUp
+│   │   │   ├── guide.md
+│   │   │   └── templates/
+│   │   ├── github/guide.md
+│   │   ├── slack/guide.md
+│   │   ├── google-docs/guide.md
+│   │   ├── google-sheets/guide.md
+│   │   ├── granola/guide.md
+│   │   └── terminal.md
 │   │
 │   └── workflows/                      # Workflows multi-MCP
+│       ├── README.md
 │       ├── daily-standup.md
 │       ├── create-initiative.md
 │       └── sprint-report.md
 │
-├── mcp/                                # MANOS
-│   ├── cursor-config.json              # Referencia de ~/.cursor/mcp.json
-│   └── servers/                        # Servidores MCP custom
-│       └── google-docs → symlink
+├── mcp/                                # MANOS - Config MCPs
+│   ├── README.md
+│   ├── cursor-config.json              # Config para Cursor IDE
+│   ├── claude-code-config.example.json # Ejemplo para Claude Code CLI
+│   └── servers/README.md               # Docs de servidores
 │
-├── channels/                           # BOCAS
-│   ├── telegram/
-│   │   ├── bot.py
-│   │   ├── requirements.txt
-│   │   └── README.md
-│   └── cursor/
-│       └── rules/
+├── channels/                           # BOCAS - Interfaces
+│   └── telegram/
+│       ├── bot.py                      # Bot de Telegram
+│       ├── requirements.txt
+│       ├── start.sh
+│       ├── .env.example
+│       └── README.md
 │
+├── .env                                # Variables de entorno (gitignored)
 ├── .env.example
 └── .gitignore
 ```
 
 ---
 
-## MCPs Disponibles (Las Manos)
+## MCPs Configurados
 
-| MCP | Propósito | Guía |
-|-----|-----------|------|
-| **ClickUp** | Product Management (Initiatives, Epics, User Stories) | `docs/integrations/clickup/` |
-| **GitHub** | Código, PRs, Issues | `docs/integrations/github/` |
-| **Slack** | Comunicación, notificaciones | `docs/integrations/slack/` |
-| **Google Docs** | Documentación, specs, notas | `docs/integrations/google-docs/` |
-| **Google Sheets** | Datos, reportes, tracking | `docs/integrations/google-sheets/` |
-| **Granola** | Meeting notes, transcripciones | `docs/integrations/granola/` |
+| MCP | Propósito | Config | Guía |
+|-----|-----------|--------|------|
+| **ClickUp** | Product Management (Initiatives, Epics, User Stories) | npx package | `docs/integrations/clickup/` |
+| **GitHub** | Código, PRs, Issues (requiere GitHub Copilot) | Remote URL | `docs/integrations/github/` |
+| **Slack** | Comunicación, notificaciones | npx package | `docs/integrations/slack/` |
+| **Google Docs/Sheets** | Documentación y datos | Local server | `docs/integrations/google-docs/` |
+| **Granola** | Meeting notes, transcripciones | Python module | `docs/integrations/granola/` |
+
+Ver configuración completa en `mcp/cursor-config.json` o `mcp/claude-code-config.example.json`
 
 ---
 
@@ -114,9 +122,9 @@ claudio/
 
 | Workflow | MCPs | Trigger |
 |----------|------|---------|
-| **Daily Standup** | Docs + Slack | "Crea las notas para la daily" |
-| **Create Initiative** | ClickUp + Docs + Slack | "Crea una initiative para X" |
-| **Sprint Report** | ClickUp + Sheets + Slack | "Genera el reporte del sprint" |
+| **Daily Standup** | Google Docs + Slack | "Crea las notas para la daily" |
+| **Create Initiative** | ClickUp + Google Docs | "Crea una initiative para X" |
+| **Sprint Report** | ClickUp + Google Sheets + Slack | "Genera el reporte del sprint" |
 
 Ver detalles en `docs/workflows/`
 
@@ -182,16 +190,57 @@ mostrar_borrador: siempre
 
 ---
 
-## Quick Reference: ClickUp IDs
+## Quick Reference: ClickUp
 
-| Qué | List ID | Dónde |
-|-----|---------|-------|
-| Initiatives | `901213053436` | P&T - General |
-| Q1 2026 Epics | `901215396098` | DS & AI Squad |
-| Epics Backlog | `901213056240` | DS & AI Squad |
-| Sprint Backlog | `901213056238` | DS & AI Squad |
+Para IDs actualizados, ver `docs/integrations/clickup/config.md`
 
-Ver más en `docs/integrations/clickup/config.md`
+| Acción | List ID | Notas |
+|--------|---------|-------|
+| Query Initiatives | `901213053436` | P&T - General |
+| Query Epics (Q1 2026) | `901215396098` | Cambiar cada quarter |
+| Create User Stories | `901213056238` | Sprint Backlog |
+
+---
+
+## Bot de Telegram
+
+### Iniciar el Bot
+```bash
+# Opción 1: Desde el directorio raíz
+source venv/bin/activate
+python3 channels/telegram/bot.py
+
+# Opción 2: Usando el script de inicio
+./channels/telegram/start.sh
+```
+
+### Detener el Bot
+```bash
+# Matar procesos y limpiar lock file
+./kill_bot_processes.sh
+
+# O manualmente
+pkill -f "python.*bot.py"
+rm -f /tmp/telegram_claude_bot.lock
+```
+
+### Comandos de Telegram
+| Comando | Descripción |
+|---------|-------------|
+| `/start` | Mensaje de bienvenida |
+| `/help` | Ayuda detallada |
+| `/new` | Nueva conversación (limpia contexto) |
+| `/status` | Estado del bot y configuración |
+| `/myid` | Muestra tu ID de usuario |
+
+### Variables de Entorno (.env)
+```bash
+TELEGRAM_BOT_TOKEN=xxx          # Token de @BotFather
+ALLOWED_USER_IDS=123456789      # IDs autorizados (separados por coma)
+WORKSPACE_PATH=/path/to/claudio # Directorio de trabajo
+OPENAI_API_KEY=sk-xxx           # Para transcripción de voz
+COMMAND_TIMEOUT=1800            # Timeout en segundos (30 min)
+```
 
 ---
 
@@ -201,3 +250,4 @@ Ver más en `docs/integrations/clickup/config.md`
 2. **Los MCPs evolucionan** - revisa `docs/integrations/` para capacidades actualizadas
 3. **Contexto de PropHero** - trabajas para el equipo de P&T de PropHero
 4. **Prioridad**: Productividad del equipo > Perfección técnica
+5. **Bot de Telegram** - usa Claude Code CLI para ejecutar comandos
