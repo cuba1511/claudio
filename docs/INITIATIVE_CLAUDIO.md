@@ -246,10 +246,11 @@ Why is creating artifacts slow?
 
 | Resource | Link |
 |----------|------|
+| **User Story (ClickUp)** | [869bzp7xa](https://app.clickup.com/t/869bzp7xa) |
 | **Repository** | github.com/[org]/claudio |
 | **CLAUDE.md** | Agent identity and behavior rules |
-| **Skills Documentation** | /docs/skills/ |
-| **ClickUp Templates** | /docs/clickup/structure/ |
+| **ClickUp Config** | `/docs/integrations/clickup/config.md` |
+| **ClickUp Templates** | `/docs/integrations/clickup/templates/` |
 
 ---
 

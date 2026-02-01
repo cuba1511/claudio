@@ -89,6 +89,8 @@ claudio/
 ## Documentación
 
 - [Instrucciones de Claudio](./CLAUDE.md)
+- [Initiative en ClickUp](https://app.clickup.com/t/869bzp7xa)
+- [Initiative Doc](./docs/INITIATIVE_CLAUDIO.md)
 - [Integración ClickUp](./docs/integrations/clickup/guide.md)
 - [Integración Slack](./docs/integrations/slack/guide.md)
 - [Workflows](./docs/workflows/README.md)
