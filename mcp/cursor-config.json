@@ -1,0 +1,54 @@
+{
+  "mcpServers": {
+    "google-docs-mcp": {
+      "command": "node",
+      "args": [
+        "/Users/ignaciodelacuba/Dev/mcp-servers/mcp-googledocs-server/dist/server.js"
+      ]
+    },
+    "github": {
+      "url": "https://api.githubcopilot.com/mcp/",
+      "headers": {
+        "Authorization": "Bearer YOUR_GITHUB_COPILOT_TOKEN"
+      }
+    },
+    "slack": {
+      "command": "/Users/ignaciodelacuba/.nvm/versions/node/v20.20.0/bin/npx",
+      "args": [
+        "-y",
+        "slack-mcp-server@latest",
+        "--transport",
+        "stdio"
+      ],
+      "env": {
+        "PATH": "/Users/ignaciodelacuba/.nvm/versions/node/v20.20.0/bin:/usr/local/bin:/usr/bin:/bin",
+        "SLACK_MCP_XOXC_TOKEN": "xoxc-YOUR_TOKEN",
+        "SLACK_MCP_XOXD_TOKEN": "xoxd-YOUR_TOKEN",
+        "SLACK_MCP_ADD_MESSAGE_TOOL": "true"
+      }
+    },
+    "clickup": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@taazkareem/clickup-mcp-server@latest"
+      ],
+      "env": {
+        "CLICKUP_MCP_LICENSE_KEY": "YOUR_LICENSE_KEY",
+        "CLICKUP_API_KEY": "YOUR_API_KEY",
+        "CLICKUP_TEAM_ID": "YOUR_TEAM_ID",
+        "DOCUMENT_SUPPORT": "true"
+      }
+    },
+    "granola-mcp": {
+      "command": "python",
+      "args": [
+        "-m",
+        "granola_mcp.mcp"
+      ],
+      "env": {
+        "GRANOLA_CACHE_PATH": "/Users/ignaciodelacuba/Library/Application Support/Granola/cache-v3.json"
+      }
+    }
+  }
+}
