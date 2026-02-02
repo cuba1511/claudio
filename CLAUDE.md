@@ -89,11 +89,18 @@ claudio/
 │   └── servers/README.md               # Docs de servidores
 │
 ├── channels/                           # BOCAS - Interfaces
-│   └── telegram/
-│       ├── bot.py                      # Bot de Telegram
+│   ├── telegram/
+│   │   ├── bot.py                      # Bot de Telegram
+│   │   ├── requirements.txt
+│   │   ├── start.sh
+│   │   ├── .env.example
+│   │   └── README.md
+│   └── web/
+│       ├── app.py                      # FastAPI Dashboard
+│       ├── templates/
+│       │   └── dashboard.html
 │       ├── requirements.txt
 │       ├── start.sh
-│       ├── .env.example
 │       └── README.md
 │
 ├── .env                                # Variables de entorno (gitignored)
@@ -243,6 +250,38 @@ COMMAND_TIMEOUT=1800            # Timeout en segundos (30 min)
 
 ---
 
+## Web Dashboard
+
+### Iniciar el Dashboard
+```bash
+# Desde el directorio raíz de claudio
+cd channels/web
+./start.sh
+
+# O en modo desarrollo (con hot reload)
+./start.sh --dev
+```
+
+Abre http://localhost:8000 en tu navegador.
+
+### Características
+- 🔌 **Vista de MCPs** - Lista todos los MCPs configurados
+- 🏥 **Health Checks** - Verifica el estado de cada MCP
+- 📚 **Documentación** - Acceso rápido a guías de integraciones
+- ⚡ **Workflows** - Lista de workflows disponibles
+- 🧠 **Contexto** - Visualiza el CLAUDE.md
+
+### API Endpoints
+| Endpoint | Descripción |
+|----------|-------------|
+| `GET /` | Dashboard principal (HTML) |
+| `GET /api/mcps` | Lista todos los MCPs |
+| `GET /api/mcps/health` | Health check de todos los MCPs |
+| `GET /api/mcps/{name}/health` | Health check de un MCP específico |
+| `GET /api/context` | Obtiene el CLAUDE.md |
+
+---
+
 ## Notas Importantes
 
 1. **Este archivo define quién eres** - léelo al iniciar sesión
@@ -250,3 +289,4 @@ COMMAND_TIMEOUT=1800            # Timeout en segundos (30 min)
 3. **Contexto de PropHero** - trabajas para el equipo de P&T de PropHero
 4. **Prioridad**: Productividad del equipo > Perfección técnica
 5. **Bot de Telegram** - usa Claude Code CLI para ejecutar comandos
+6. **Web Dashboard** - interfaz para monitorear MCPs en http://localhost:8000

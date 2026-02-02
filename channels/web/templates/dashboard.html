@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claudio Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        'claudio': {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            900: '#0c4a6e',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .status-dot {
+            animation: pulse-dot 2s ease-in-out infinite;
+        }
+        .status-ready { background-color: #22c55e; }
+        .status-configured { background-color: #3b82f6; }
+        .status-warning { background-color: #f59e0b; }
+        .status-error { background-color: #ef4444; }
+        .status-unknown { background-color: #6b7280; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Header -->
+    <header class="bg-white border-b border-gray-200 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center gap-3">
+                    <span class="text-3xl">🤖</span>
+                    <div>
+                        <h1 class="text-xl font-bold text-gray-900">Claudio</h1>
+                        <p class="text-xs text-gray-500">Asistente de Productividad - PropHero</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <span id="last-check" class="text-sm text-gray-500"></span>
+                    <button onclick="checkAllHealth()" 
+                            class="px-4 py-2 bg-claudio-600 text-white rounded-lg hover:bg-claudio-700 transition-colors flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                        </svg>
+                        Health Check
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Stats -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div class="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-500">MCPs Configurados</p>
+                        <p class="text-3xl font-bold text-gray-900">{{ total_mcps }}</p>
+                    </div>
+                    <span class="text-4xl">🔌</span>
+                </div>
+            </div>
+            <div class="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-500">Integraciones</p>
+                        <p class="text-3xl font-bold text-gray-900">{{ integrations|length }}</p>
+                    </div>
+                    <span class="text-4xl">📚</span>
+                </div>
+            </div>
+            <div class="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-500">Workflows</p>
+                        <p class="text-3xl font-bold text-gray-900">{{ workflows|length }}</p>
+                    </div>
+                    <span class="text-4xl">⚡</span>
+                </div>
+            </div>
+            <div class="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-500">Estado</p>
+                        <p id="overall-status" class="text-lg font-semibold text-gray-400">Sin verificar</p>
+                    </div>
+                    <div id="overall-status-icon" class="w-4 h-4 rounded-full status-unknown status-dot"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MCPs Grid -->
+        <section class="mb-8">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <span>🔌</span> MCPs Configurados
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="mcps-grid">
+                {% for mcp in mcps %}
+                <div class="bg-white rounded-xl p-6 border border-gray-200 shadow-sm hover:shadow-md transition-shadow" 
+                     id="mcp-{{ mcp.name }}" data-mcp="{{ mcp.name }}">
+                    <div class="flex items-start justify-between mb-4">
+                        <div class="flex items-center gap-3">
+                            <span class="text-2xl">{{ mcp.icon }}</span>
+                            <div>
+                                <h3 class="font-semibold text-gray-900">{{ mcp.name }}</h3>
+                                <span class="text-xs px-2 py-0.5 rounded-full 
+                                    {% if mcp.type == 'remote' %}bg-purple-100 text-purple-700
+                                    {% elif mcp.type == 'node' %}bg-green-100 text-green-700
+                                    {% elif mcp.type == 'npx' %}bg-emerald-100 text-emerald-700
+                                    {% elif mcp.type == 'python' %}bg-blue-100 text-blue-700
+                                    {% else %}bg-gray-100 text-gray-700{% endif %}">
+                                    {{ mcp.type }}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="mcp-status">
+                            <div class="w-3 h-3 rounded-full status-unknown status-dot" id="status-{{ mcp.name }}"></div>
+                        </div>
+                    </div>
+                    <div class="text-sm text-gray-500 mcp-message" id="message-{{ mcp.name }}">
+                        Haz click en "Health Check" para verificar
+                    </div>
+                    <div class="mt-4 pt-4 border-t border-gray-100">
+                        <button onclick="toggleConfig('{{ mcp.name }}')" 
+                                class="text-sm text-claudio-600 hover:text-claudio-700">
+                            Ver configuración
+                        </button>
+                        <pre id="config-{{ mcp.name }}" class="hidden mt-2 text-xs bg-gray-50 p-3 rounded-lg overflow-auto max-h-40">{{ mcp.config | tojson(indent=2) }}</pre>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <!-- Two columns: Integrations & Workflows -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- Integrations -->
+            <section>
+                <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <span>📚</span> Documentación de Integraciones
+                </h2>
+                <div class="bg-white rounded-xl border border-gray-200 shadow-sm divide-y divide-gray-100">
+                    {% for integration in integrations %}
+                    <div class="p-4 hover:bg-gray-50 transition-colors cursor-pointer" 
+                         onclick="showDoc('{{ integration.path }}')">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <span class="text-lg">📄</span>
+                                <span class="font-medium text-gray-900">{{ integration.name }}</span>
+                            </div>
+                            {% if integration.has_config %}
+                            <span class="text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full">
+                                + config
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </section>
+
+            <!-- Workflows -->
+            <section>
+                <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <span>⚡</span> Workflows Disponibles
+                </h2>
+                <div class="bg-white rounded-xl border border-gray-200 shadow-sm divide-y divide-gray-100">
+                    {% for workflow in workflows %}
+                    <div class="p-4 hover:bg-gray-50 transition-colors cursor-pointer"
+                         onclick="showDoc('{{ workflow.path }}')">
+                        <div class="flex items-center gap-3">
+                            <span class="text-lg">🔄</span>
+                            <span class="font-medium text-gray-900">{{ workflow.name }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </section>
+        </div>
+
+        <!-- Context Section -->
+        <section class="mt-8">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <span>🧠</span> Contexto de Claudio
+            </h2>
+            <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+                <button onclick="showContext()" 
+                        class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
+                    Ver CLAUDE.md (Rules)
+                </button>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal para documentación -->
+    <div id="doc-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-2xl max-w-4xl w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col">
+            <div class="p-4 border-b border-gray-200 flex items-center justify-between">
+                <h3 id="doc-title" class="font-semibold text-gray-900">Documento</h3>
+                <button onclick="closeModal()" class="p-2 hover:bg-gray-100 rounded-lg">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div id="doc-content" class="p-6 overflow-auto flex-1 prose prose-sm max-w-none">
+                Cargando...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Toggle config visibility
+        function toggleConfig(mcpName) {
+            const config = document.getElementById(`config-${mcpName}`);
+            config.classList.toggle('hidden');
+        }
+
+        // Check health for all MCPs
+        async function checkAllHealth() {
+            const button = document.querySelector('button[onclick="checkAllHealth()"]');
+            button.disabled = true;
+            button.innerHTML = `
+                <svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+                Verificando...
+            `;
+
+            try {
+                const response = await fetch('/api/mcps/health');
+                const data = await response.json();
+                
+                let readyCount = 0;
+                let errorCount = 0;
+                
+                data.mcps.forEach(mcp => {
+                    const statusDot = document.getElementById(`status-${mcp.name}`);
+                    const message = document.getElementById(`message-${mcp.name}`);
+                    
+                    // Update status dot
+                    statusDot.className = `w-3 h-3 rounded-full status-${mcp.status} status-dot`;
+                    
+                    // Update message
+                    message.textContent = mcp.message;
+                    
+                    if (mcp.status === 'ready') readyCount++;
+                    if (mcp.status === 'error') errorCount++;
+                });
+
+                // Update overall status
+                const overallStatus = document.getElementById('overall-status');
+                const overallIcon = document.getElementById('overall-status-icon');
+                
+                if (errorCount > 0) {
+                    overallStatus.textContent = `${errorCount} con errores`;
+                    overallStatus.className = 'text-lg font-semibold text-red-600';
+                    overallIcon.className = 'w-4 h-4 rounded-full status-error status-dot';
+                } else if (readyCount === data.mcps.length) {
+                    overallStatus.textContent = 'Todo OK';
+                    overallStatus.className = 'text-lg font-semibold text-green-600';
+                    overallIcon.className = 'w-4 h-4 rounded-full status-ready status-dot';
+                } else {
+                    overallStatus.textContent = 'Parcial';
+                    overallStatus.className = 'text-lg font-semibold text-amber-600';
+                    overallIcon.className = 'w-4 h-4 rounded-full status-warning status-dot';
+                }
+
+                // Update last check time
+                const lastCheck = document.getElementById('last-check');
+                lastCheck.textContent = `Última verificación: ${new Date().toLocaleTimeString()}`;
+
+            } catch (error) {
+                console.error('Error checking health:', error);
+            } finally {
+                button.disabled = false;
+                button.innerHTML = `
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                    Health Check
+                `;
+            }
+        }
+
+        // Show documentation in modal
+        async function showDoc(path) {
+            const modal = document.getElementById('doc-modal');
+            const title = document.getElementById('doc-title');
+            const content = document.getElementById('doc-content');
+            
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            content.innerHTML = '<p class="text-gray-500">Cargando...</p>';
+            title.textContent = path.split('/').pop();
+
+            try {
+                const response = await fetch(`/api/docs/read?path=${encodeURIComponent(path)}`);
+                const data = await response.json();
+                
+                // Simple markdown to HTML (básico)
+                content.innerHTML = `<pre class="whitespace-pre-wrap text-sm">${escapeHtml(data.content)}</pre>`;
+            } catch (error) {
+                content.innerHTML = `<p class="text-red-500">Error cargando documento: ${error.message}</p>`;
+            }
+        }
+
+        // Show context (CLAUDE.md)
+        async function showContext() {
+            const modal = document.getElementById('doc-modal');
+            const title = document.getElementById('doc-title');
+            const content = document.getElementById('doc-content');
+            
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            content.innerHTML = '<p class="text-gray-500">Cargando...</p>';
+            title.textContent = 'CLAUDE.md - Contexto de Claudio';
+
+            try {
+                const response = await fetch('/api/context');
+                const data = await response.json();
+                content.innerHTML = `<pre class="whitespace-pre-wrap text-sm">${escapeHtml(data.content)}</pre>`;
+            } catch (error) {
+                content.innerHTML = `<p class="text-red-500">Error cargando contexto: ${error.message}</p>`;
+            }
+        }
+
+        // Close modal
+        function closeModal() {
+            const modal = document.getElementById('doc-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        // Escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Close modal on background click
+        document.getElementById('doc-modal').addEventListener('click', (e) => {
+            if (e.target.id === 'doc-modal') {
+                closeModal();
+            }
+        });
+
+        // Close modal on Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeModal();
+            }
+        });
+    </script>
+</body>
+</html>
