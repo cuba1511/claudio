@@ -543,11 +543,10 @@ def process_message_sync(user_id: str, text: str, say, channel: str, thread_ts: 
     def run_claude():
         """Ejecuta Claude CLI en un thread separado."""
         try:
-            # Construir comando - EXACTAMENTE igual que Telegram
+            # Construir comando
+            # IMPORTANTE: NO usar -p porque tiene un bug con MCPs
+            # En su lugar, usamos pipe input (echo | claude)
             cmd = [CLAUDE_CLI_PATH]
-            
-            # NO usar --mcp-config porque hace que Claude se cuelgue
-            # Los MCPs se cargan automáticamente desde ~/.claude/
             
             # Continuar sesión si existe
             if user_id in user_sessions:
@@ -560,24 +559,22 @@ def process_message_sync(user_id: str, text: str, say, channel: str, thread_ts: 
             elif ALLOWED_TOOLS and ALLOWED_TOOLS != '*':
                 cmd.extend(['--allowedTools', ALLOWED_TOOLS])
             
-            # Agregar -p para modo no interactivo y la query
-            cmd.extend(['-p', text])
+            # NO agregar -p, usaremos pipe input
             
-            # Configurar entorno - EXACTAMENTE igual que Telegram
+            # Configurar entorno
             env = os.environ.copy()
             env['PWD'] = WORKSPACE_PATH
             
-            logger.info(f"[Usuario {user_id}] Ejecutando: {' '.join(cmd[:4])}...")
-            logger.debug(f"[Usuario {user_id}] Comando completo: {' '.join(cmd)}")
+            logger.info(f"[Usuario {user_id}] Ejecutando: {' '.join(cmd)}...")
             
-            # Ejecutar Claude CLI
-            # IMPORTANTE: stdin=subprocess.DEVNULL evita que se quede esperando input
+            # Ejecutar Claude CLI usando pipe input en vez de -p
+            # Esto evita el bug de -p con MCPs
             start_time = time.time()
-            logger.info(f"[Usuario {user_id}] Iniciando subprocess.run()...")
+            logger.info(f"[Usuario {user_id}] Iniciando subprocess con pipe input...")
             
             process_result = subprocess.run(
                 cmd,
-                stdin=subprocess.DEVNULL,  # Evita bloqueo esperando input
+                input=text,  # Pipe input en vez de -p
                 capture_output=True,
                 text=True,
                 timeout=COMMAND_TIMEOUT,
