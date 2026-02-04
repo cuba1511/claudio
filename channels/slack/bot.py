@@ -546,11 +546,8 @@ def process_message_sync(user_id: str, text: str, say, channel: str, thread_ts: 
             # Construir comando - EXACTAMENTE igual que Telegram
             cmd = [CLAUDE_CLI_PATH]
             
-            # Cargar configuración de MCPs explícitamente
-            mcp_config_path = os.path.expanduser("~/.cursor/mcp.json")
-            if os.path.exists(mcp_config_path):
-                cmd.extend(['--mcp-config', mcp_config_path])
-                logger.info(f"[Usuario {user_id}] Cargando MCPs desde {mcp_config_path}")
+            # NO usar --mcp-config porque hace que Claude se cuelgue
+            # Los MCPs se cargan automáticamente desde ~/.claude/
             
             # Continuar sesión si existe
             if user_id in user_sessions:
