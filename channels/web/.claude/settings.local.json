@@ -1,0 +1,11 @@
+{
+  "enabledMcpjsonServers": [
+    "google-docs-mcp",
+    "slack"
+  ],
+  "permissions": {
+    "allow": [
+      "mcp__slack__conversations_search_messages"
+    ]
+  }
+}

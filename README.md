@@ -50,7 +50,7 @@ Definition → Initiative → Epic → User Story → Execution
 |-------|-------------|--------|
 | **Terminal** | Claude Code CLI / Cursor IDE | ✅ |
 | **Telegram** | Bot para acceso móvil | ✅ |
-| **Slack** | Mensajes directos | 🔜 |
+| **Slack** | DMs y menciones en canales | ✅ |
 | **WhatsApp** | Bot móvil | 🔜 |
 
 ## Quick Start
@@ -69,13 +69,24 @@ pip install -r requirements.txt
 python bot.py
 ```
 
+### Usar con Slack
+
+```bash
+cd channels/slack
+pip install -r requirements.txt
+# Configura SLACK_BOT_TOKEN y SLACK_APP_TOKEN en .env
+python bot.py
+```
+
+Ver configuración completa en `channels/slack/README.md`
+
 ## Estructura
 
 ```
 claudio/
 ├── CLAUDE.md              # Instrucciones para Claude (rules)
 ├── claudio.png            # Diagrama de arquitectura
-├── kill_bot_processes.sh  # Utilidad para el bot
+├── kill_bot_processes.sh  # Utilidad para los bots
 ├── docs/
 │   ├── integrations/      # Guías por MCP
 │   └── workflows/         # Workflows multi-MCP
@@ -83,7 +94,9 @@ claudio/
 │   ├── cursor-config.json # Config para Cursor
 │   └── servers/           # Servidores MCP
 └── channels/
-    └── telegram/          # Bot de Telegram
+    ├── telegram/          # Bot de Telegram
+    ├── slack/             # Bot de Slack
+    └── web/               # Dashboard web
 ```
 
 ## Documentación

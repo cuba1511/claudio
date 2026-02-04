@@ -95,6 +95,12 @@ claudio/
 │   │   ├── start.sh
 │   │   ├── .env.example
 │   │   └── README.md
+│   ├── slack/
+│   │   ├── bot.py                      # Bot de Slack
+│   │   ├── requirements.txt
+│   │   ├── start.sh
+│   │   ├── .env.example
+│   │   └── README.md
 │   └── web/
 │       ├── app.py                      # FastAPI Dashboard
 │       ├── templates/
@@ -250,6 +256,54 @@ COMMAND_TIMEOUT=1800            # Timeout en segundos (30 min)
 
 ---
 
+## Bot de Slack
+
+### Iniciar el Bot
+```bash
+# Opción 1: Desde el directorio raíz
+source venv/bin/activate
+python3 channels/slack/bot.py
+
+# Opción 2: Usando el script de inicio
+./channels/slack/start.sh
+```
+
+### Detener el Bot
+```bash
+# Matar procesos
+pkill -f "python.*slack.*bot.py"
+rm -f /tmp/slack_claude_bot.lock
+```
+
+### Formas de Interactuar
+| Método | Descripción |
+|--------|-------------|
+| **DM directo** | Escríbele al bot en mensaje directo |
+| **Mención** | `@Claudio [tu mensaje]` en cualquier canal |
+| `/claudio [mensaje]` | Comando slash |
+| `/claudio-new` | Nueva conversación (limpia contexto) |
+| `/claudio-status` | Estado del bot y tu autorización |
+
+### Variables de Entorno (.env)
+```bash
+SLACK_BOT_TOKEN=xoxb-xxx        # Bot Token de Slack App
+SLACK_APP_TOKEN=xapp-xxx        # App Token para Socket Mode
+SLACK_ALLOWED_USER_IDS=U123     # IDs de Slack autorizados
+WORKSPACE_PATH=/path/to/claudio # Directorio de trabajo
+COMMAND_TIMEOUT=1800            # Timeout en segundos (30 min)
+```
+
+### Configuración de Slack App
+Ver guía completa en `channels/slack/README.md`
+
+1. Crear App en [api.slack.com/apps](https://api.slack.com/apps)
+2. Agregar Bot Token Scopes: `chat:write`, `app_mentions:read`, `im:history`, `im:read`, `im:write`
+3. Habilitar Socket Mode y generar App Token
+4. Agregar Event Subscriptions: `app_mention`, `message.im`
+5. (Opcional) Crear Slash Commands: `/claudio`, `/claudio-new`, `/claudio-status`
+
+---
+
 ## Web Dashboard
 
 ### Iniciar el Dashboard
@@ -289,4 +343,5 @@ Abre http://localhost:8000 en tu navegador.
 3. **Contexto de PropHero** - trabajas para el equipo de P&T de PropHero
 4. **Prioridad**: Productividad del equipo > Perfección técnica
 5. **Bot de Telegram** - usa Claude Code CLI para ejecutar comandos
-6. **Web Dashboard** - interfaz para monitorear MCPs en http://localhost:8000
+6. **Bot de Slack** - mismo patrón que Telegram, soporta DMs y menciones
+7. **Web Dashboard** - interfaz para monitorear MCPs en http://localhost:8000

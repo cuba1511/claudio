@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__google-docs-mcp__searchGoogleDocs",
+      "mcp__google-docs-mcp__readGoogleDoc",
+      "mcp__google-docs-mcp__appendToGoogleDoc",
+      "mcp__google-docs-mcp__findElement",
+      "Bash(python3:*)",
+      "mcp__google-docs-mcp__deleteRange",
+      "mcp__google-docs-mcp__insertTable",
+      "mcp__google-docs-mcp__editTableCell",
+      "mcp__google-docs-mcp__createSpreadsheet",
+      "mcp__google-docs-mcp__writeSpreadsheet",
+      "mcp__google-docs-mcp__listGoogleSheets",
+      "mcp__claude_ai_ClickUp__clickup_get_task",
+      "mcp__claude_ai_ClickUp__clickup_update_task"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "google-docs-mcp",
+    "slack",
+    "ClickUp"
+  ]
+}
