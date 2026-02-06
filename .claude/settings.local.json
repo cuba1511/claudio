@@ -13,7 +13,20 @@
       "mcp__google-docs-mcp__writeSpreadsheet",
       "mcp__google-docs-mcp__listGoogleSheets",
       "mcp__claude_ai_ClickUp__clickup_get_task",
-      "mcp__claude_ai_ClickUp__clickup_update_task"
+      "mcp__claude_ai_ClickUp__clickup_update_task",
+      "Bash(npm view:*)",
+      "mcp__claude_ai_ClickUp__clickup_search",
+      "mcp__google-docs-mcp__readSpreadsheet",
+      "mcp__claude_ai_ClickUp__clickup_create_document",
+      "mcp__claude_ai_ClickUp__clickup_create_document_page",
+      "WebSearch",
+      "WebFetch(domain:docs.mixpanel.com)",
+      "mcp__google-docs-mcp__getSpreadsheetInfo",
+      "mcp__ClickUp__get_folder",
+      "mcp__ClickUp__get_workspace_tasks",
+      "mcp__claude_ai_ClickUp__clickup_get_list",
+      "mcp__claude_ai_ClickUp__clickup_get_workspace_hierarchy",
+      "mcp__claude_ai_ClickUp__clickup_get_task_time_entries"
     ]
   },
   "enableAllProjectMcpServers": true,
