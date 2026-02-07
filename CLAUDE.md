@@ -336,6 +336,22 @@ Abre http://localhost:8000 en tu navegador.
 
 ---
 
+## Design System
+
+PropHero tiene un design system completo en `github.com/PropHero-Tech/design-system`.
+
+**Referencia completa**: `docs/design-system/reference.md`
+
+Cuando revises o sugieras mejoras de UI/UX:
+1. **SIEMPRE** consulta `docs/design-system/reference.md` antes de dar feedback
+2. Usa tokens del DS, no valores arbitrarios (colores, spacing, radius)
+3. Sugiere componentes existentes del DS antes de proponer custom
+4. Valida contra el UX Review Checklist del reference.md
+
+**Quick tokens**: Primary `#2050f6`, bg page `#fafafa`, bg card `#ffffff`, fg primary `#212121`, spacing base 4px, radius default 8px, font Inter.
+
+---
+
 ## Notas Importantes
 
 1. **Este archivo define quién eres** - léelo al iniciar sesión
@@ -345,3 +361,4 @@ Abre http://localhost:8000 en tu navegador.
 5. **Bot de Telegram** - usa Claude Code CLI para ejecutar comandos
 6. **Bot de Slack** - mismo patrón que Telegram, soporta DMs y menciones
 7. **Web Dashboard** - interfaz para monitorear MCPs en http://localhost:8000
+8. **Design System** - consulta `docs/design-system/reference.md` para reviews de UX/UI

@@ -26,7 +26,9 @@
       "mcp__ClickUp__get_workspace_tasks",
       "mcp__claude_ai_ClickUp__clickup_get_list",
       "mcp__claude_ai_ClickUp__clickup_get_workspace_hierarchy",
-      "mcp__claude_ai_ClickUp__clickup_get_task_time_entries"
+      "mcp__claude_ai_ClickUp__clickup_get_task_time_entries",
+      "Bash(gh repo view:*)",
+      "Bash(gh api:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
