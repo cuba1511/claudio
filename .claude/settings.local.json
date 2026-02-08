@@ -28,7 +28,18 @@
       "mcp__claude_ai_ClickUp__clickup_get_workspace_hierarchy",
       "mcp__claude_ai_ClickUp__clickup_get_task_time_entries",
       "Bash(gh repo view:*)",
-      "Bash(gh api:*)"
+      "Bash(gh api:*)",
+      "Bash(gh repo clone:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx next lint:*)",
+      "Bash(node_modules/.bin/tsc:*)",
+      "Bash(node:*)",
+      "mcp__google-docs-mcp__createDocument",
+      "Bash(npx next build:*)",
+      "mcp__ClickUp__get_task",
+      "mcp__ClickUp__get_workspace_hierarchy",
+      "Bash(xargs:*)",
+      "Bash(gh repo list:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
