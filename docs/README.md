@@ -1,66 +1,88 @@
-# Documentación de Claudio
+# Documentacion de Claudio
+
+El cerebro de Claudio -- toda la documentacion, guias, configuracion y workflows.
 
 ## Estructura
 
 ```
 docs/
-├── README.md                    ← Este archivo
-├── skills/                      ← Capacidades del agente por MCP
-│   ├── README.md
-│   ├── clickup.md              ← Product Management
-│   ├── github.md               ← Código y PRs
-│   ├── google-docs.md          ← Documentación
-│   └── terminal.md             ← Comandos locales
+├── README.md                        ← Este archivo
+├── INITIATIVE_CLAUDIO.md            ← Initiative del proyecto
 │
-└── clickup/                     ← Configuración específica de ClickUp
-    ├── config.md               ← IDs de listas y espacios
-    └── structure/              ← Templates para crear artifacts
-        ├── user_story_structure.md
-        ├── epic_structure.md
-        └── initiative_structure.md
+├── integrations/                    ← Guias por MCP
+│   ├── clickup/
+│   │   ├── config.md               ← IDs de listas y espacios
+│   │   ├── guide.md                ← Guia de uso
+│   │   └── templates/              ← Templates para artifacts
+│   │       ├── initiative.md
+│   │       ├── epic.md
+│   │       └── user-story.md
+│   ├── github/guide.md             ← Codigo y PRs
+│   ├── slack/guide.md              ← Comunicacion
+│   ├── google-docs/guide.md        ← Documentacion
+│   ├── google-sheets/guide.md      ← Datos y reportes
+│   ├── granola/guide.md            ← Meeting notes
+│   └── terminal.md                 ← Comandos locales
+│
+├── workflows/                       ← Workflows multi-MCP
+│   ├── README.md
+│   ├── daily-standup.md
+│   ├── create-initiative.md
+│   └── sprint-report.md
+│
+└── design-system/
+    └── reference.md                 ← Design system de PropHero
 ```
 
-## Cómo Funciona
+## Como funciona
 
-### CLAUDE.md (Raíz del proyecto)
+### CLAUDE.md (Raiz del proyecto)
 Define la **identidad** de Claudio:
 - Personalidad y tono
 - Principios de comportamiento
-- Resumen de skills
-- Reglas de interacción por contexto
+- Resumen de capacidades
+- Reglas de interaccion por contexto
 
-### docs/skills/
-Documenta **cada skill en detalle**:
-- Triggers (cuándo activar)
-- Capacidades específicas
+### docs/integrations/
+Documenta **cada integracion MCP en detalle**:
+- Configuracion y setup
+- Capacidades especificas
 - Reglas de comportamiento
 - Ejemplos de uso
 
-### docs/clickup/
-Configuración específica de ClickUp para PropHero:
-- IDs de listas y espacios
-- Templates para artifacts
-- Workflows de creación
+### docs/integrations/clickup/
+Configuracion especifica de ClickUp para PropHero:
+- IDs de listas y espacios (`config.md`)
+- Templates para Initiatives, Epics, User Stories (`templates/`)
 
-## Agregar Nuevo Skill
+### docs/workflows/
+Workflows que combinan multiples MCPs:
+- Daily Standup (Slack + Google Docs)
+- Create Initiative (ClickUp + Google Docs)
+- Sprint Report (ClickUp + Slack + Sheets)
 
-1. Crear `docs/skills/{nombre}.md` con:
-   - Triggers
+### docs/design-system/
+Referencia del Design System de PropHero para reviews de UI/UX.
+
+## Agregar nueva integracion
+
+1. Crear `docs/integrations/{nombre}/guide.md` con:
+   - Setup y configuracion
    - Capacidades
    - Reglas
    - Ejemplos
 
-2. Actualizar `docs/skills/README.md`
+2. Actualizar `CLAUDE.md` con resumen de la integracion
 
-3. Actualizar `CLAUDE.md` con resumen del skill
+3. Agregar config MCP en `mcp/cursor-config.json`
 
-## Mantener Actualizado
+## Mantener actualizado
 
 ### Cada Quarter
-- Actualizar ID de Epics en `docs/clickup/config.md`
+- Actualizar ID de Epics en `docs/integrations/clickup/config.md`
 
-### Cuando Cambie un MCP
-- Actualizar skill correspondiente en `docs/skills/`
+### Cuando cambie un MCP
+- Actualizar guia correspondiente en `docs/integrations/`
 
-### Cuando Cambie el Comportamiento
+### Cuando cambie el comportamiento
 - Actualizar `CLAUDE.md`
