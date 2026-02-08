@@ -1,4 +1,21 @@
-python-telegram-bot==20.7
-python-dotenv==1.0.0
+# =============================================================================
+# Claudio - Dependencias Python (raiz)
+# =============================================================================
+# Dependencias compartidas entre todos los canales.
+# Cada canal tiene su propio requirements.txt con dependencias especificas:
+#   - channels/telegram/requirements.txt
+#   - channels/slack/requirements.txt
+#   - channels/web/requirements.txt
+#
+# Para instalar todo:
+#   pip install -r requirements.txt
+#   pip install -r channels/telegram/requirements.txt
+#   pip install -r channels/slack/requirements.txt
+#   pip install -r channels/web/requirements.txt
+# =============================================================================
+
+# Shared
+python-dotenv>=1.0.0
+
+# Voice transcription (shared by Telegram and Slack bots)
 openai>=1.0.0
-ffmpeg-python>=0.2.0
