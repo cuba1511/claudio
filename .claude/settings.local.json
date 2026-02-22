@@ -39,7 +39,8 @@
       "mcp__ClickUp__get_task",
       "mcp__ClickUp__get_workspace_hierarchy",
       "Bash(xargs:*)",
-      "Bash(gh repo list:*)"
+      "Bash(gh repo list:*)",
+      "Bash(claude mcp:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
