@@ -1,20 +1,20 @@
 # Claudio
 
-**Asistente de productividad del equipo de Product & Technology de PropHero.**
+**Productivity assistant for PropHero's Product & Technology team.**
 
-Integra MCPs (ClickUp, GitHub, Slack, Google Docs/Sheets, BigQuery, Granola) para automatizar tareas de product management, desarrollo y comunicación. Accesible desde Terminal, Slack, Telegram y Web.
+Connects MCPs (ClickUp, GitHub, Slack, Google Docs/Sheets, BigQuery, Granola) to automate product management, development, and communication tasks. Available via Terminal, Slack, Telegram, and Web.
 
-![Arquitectura de Claudio](./docs/images/claudio.png)
+![Claudio Architecture](./docs/images/claudio.png)
 
 ---
 
 ## Quick Start
 
-### Prerrequisitos
+### Prerequisites
 
 - Python 3.10+, Node.js 18+
-- [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) (para bots)
-- Cursor IDE (para uso directo)
+- [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) (for bots and scripts)
+- Cursor IDE (for direct usage)
 
 ### Setup
 
@@ -22,44 +22,64 @@ Integra MCPs (ClickUp, GitHub, Slack, Google Docs/Sheets, BigQuery, Granola) par
 git clone <repo-url> claudio && cd claudio
 python3 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env  # editar con tus valores
+cp .env.example .env  # fill in your values
 ```
 
-### Uso con Cursor (recomendado)
+### Usage with Cursor (recommended)
 
-1. Abre el proyecto en Cursor
-2. Configura MCPs usando `mcp/cursor-config.json` como referencia para `~/.cursor/mcp.json`
-3. Reinicia Cursor — listo
+1. Open the project in Cursor
+2. Set up MCPs using `mcp/cursor-config.json` as reference for `~/.cursor/mcp.json`
+3. Restart Cursor — ready to go
 
-### Canales
+### Channels
 
-| Canal | Iniciar | Docs |
-|-------|---------|------|
+| Channel | Start | Docs |
+|---------|-------|------|
 | **Telegram** | `./channels/telegram/start.sh` | [README](./channels/telegram/README.md) |
 | **Slack** | `./channels/slack/start.sh` | [README](./channels/slack/README.md) |
 | **Web Dashboard** | `./channels/web/start.sh` → `localhost:8000` | [README](./channels/web/README.md) |
 
-Cada canal tiene su propio `requirements.txt` — instala antes de iniciar.
+Each channel has its own `requirements.txt` — install before starting.
 
 ---
 
-## Estructura del Proyecto
+## Scripts
+
+Automated cron jobs that run Claude Code CLI with specific prompts and MCP access.
+
+| Script | Schedule | What it does |
+|--------|----------|--------------|
+| [`weekly-bot-report.sh`](./scripts/weekly-bot-report.sh) | Mondays 9 AM | Pulls bot metrics from Google Sheets and emails a WoW performance report |
+| [`monthly-ds-ai-report.sh`](./scripts/monthly-ds-ai-report.sh) | 1st of month 10 AM | Generates DS & AI squad monthly review from ClickUp → Google Doc |
+| [`kill_bot_processes.sh`](./scripts/kill_bot_processes.sh) | Manual | Kills all running bot processes and cleans up lock files |
+
+Logs go to `scripts/logs/`. To set up cron:
+
+```bash
+crontab -e
+# Weekly bot report — every Monday at 9 AM
+0 9 * * 1 /path/to/claudio/scripts/weekly-bot-report.sh
+# Monthly DS&AI report — 1st of each month at 10 AM
+0 10 1 * * /path/to/claudio/scripts/monthly-ds-ai-report.sh
+```
+
+---
+
+## Project Structure
 
 ```
 claudio/
-├── CLAUDE.md              # Identidad e instrucciones de Claudio
-├── docs/                  # Cerebro — documentación y guías
-│   ├── images/            # Assets (claudio.png)
-│   ├── integrations/      # Guía por MCP (clickup, github, slack, etc.)
-│   ├── workflows/         # Workflows multi-MCP
+├── CLAUDE.md              # Identity and instructions
+├── docs/                  # Brain — documentation and guides
+│   ├── images/            # Assets (architecture diagram)
+│   ├── integrations/      # Guide per MCP (clickup, github, slack, etc.)
+│   ├── workflows/         # Multi-MCP workflows
 │   │   ├── product/       # daily-standup, create-initiative, sprint-report
 │   │   └── revenue/       # funnel-master, hook-script-creator
-│   └── design-system/     # Design system de PropHero
-├── mcp/                   # Manos — configuración de MCPs
-├── channels/              # Bocas — interfaces (telegram, slack, web)
-└── scripts/               # Cron jobs automatizados
-    ├── weekly-bot-report.sh
-    └── monthly-ds-ai-report.sh
+│   └── design-system/     # PropHero design system reference
+├── mcp/                   # Hands — MCP configuration
+├── channels/              # Mouths — interfaces (telegram, slack, web)
+└── scripts/               # Automated cron jobs
 ```
 
 ---
@@ -68,40 +88,45 @@ claudio/
 
 | Workflow | MCPs | Trigger |
 |----------|------|---------|
-| [Daily Standup](./docs/workflows/product/daily-standup.md) | Slack + Docs | "Crea las notas para la daily" |
-| [Create Initiative](./docs/workflows/product/create-initiative.md) | ClickUp + Docs | "Crea una initiative para X" |
-| [Sprint Report](./docs/workflows/product/sprint-report.md) | ClickUp + Slack + Sheets | "Genera el reporte del sprint" |
-| [Weekly Bot Report](./docs/workflows/weekly-bot-report.md) | Sheets + Gmail | Cron: lunes 9 AM |
-| [Monthly DS&AI Report](./docs/workflows/monthly-ds-ai-report.md) | ClickUp + Docs | Cron: día 1 del mes |
-| [Funnel Master](./docs/workflows/revenue/funnel-master.md) | Sheets + BigQuery | "Analiza el funnel" |
-| [Hook Script Creator](./docs/workflows/revenue/hook-script-creator-v3.md) | Docs | "Crea hook scripts" |
+| [Daily Standup](./docs/workflows/product/daily-standup.md) | Slack + Docs | "Create daily notes" |
+| [Create Initiative](./docs/workflows/product/create-initiative.md) | ClickUp + Docs | "Create an initiative for X" |
+| [Sprint Report](./docs/workflows/product/sprint-report.md) | ClickUp + Slack + Sheets | "Generate the sprint report" |
+| [Weekly Bot Report](./docs/workflows/weekly-bot-report.md) | Sheets + Gmail | Cron: Monday 9 AM |
+| [Monthly DS&AI Report](./docs/workflows/monthly-ds-ai-report.md) | ClickUp + Docs | Cron: 1st of month |
+| [Funnel Master](./docs/workflows/revenue/funnel-master.md) | Sheets + BigQuery | "Analyze the funnel" |
+| [Hook Script Creator](./docs/workflows/revenue/hook-script-creator-v3.md) | Docs | "Create hook scripts" |
 
 ---
 
-## Contribuir
+## Contributing
 
-### Agregar un MCP
+### Add an MCP
 
-1. Agregar config en `mcp/cursor-config.json`
-2. Crear guía en `docs/integrations/{nombre}/guide.md`
-3. Actualizar `CLAUDE.md`
+1. Add config to `mcp/cursor-config.json`
+2. Create guide at `docs/integrations/{name}/guide.md`
+3. Update `CLAUDE.md`
 
-### Agregar un workflow
+### Add a workflow
 
-1. Crear `.md` en `docs/workflows/{área}/`
-2. Si requiere cron, agregar script en `scripts/`
+1. Create `.md` in `docs/workflows/{area}/`
+2. If it needs cron, add a script to `scripts/`
 
-### Agregar un canal
+### Add a channel
 
-1. Crear directorio en `channels/{nombre}/` con `bot.py`, `requirements.txt`, `start.sh`, `.env.example`
-2. Documentar en `channels/{nombre}/README.md`
+1. Create `channels/{name}/` with `bot.py`, `requirements.txt`, `start.sh`, `.env.example`
+2. Document in `channels/{name}/README.md`
 
-### Mantenimiento periódico
+### Add a script
 
-- **Cada quarter**: actualizar ID de lista de Epics en [`docs/integrations/clickup/config.md`](./docs/integrations/clickup/config.md)
-- **Si cambia un MCP**: actualizar guía y configs en `mcp/`
-- **Si cambian reglas**: actualizar `CLAUDE.md`
+1. Create `.sh` in `scripts/` following the existing pattern (set -e, logging, Claude CLI call)
+2. Add cron entry and document in the workflow `.md`
+
+### Periodic maintenance
+
+- **Every quarter**: update Epics list ID in [`docs/integrations/clickup/config.md`](./docs/integrations/clickup/config.md)
+- **MCP changes**: update guide and configs in `mcp/`
+- **Behavior changes**: update `CLAUDE.md`
 
 ---
 
-*Claudio — Hecho con Claude para el equipo de P&T de PropHero.*
+*Claudio — Built with Claude for PropHero's P&T team.*
