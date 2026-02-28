@@ -321,6 +321,7 @@ Abre http://localhost:8000 en tu navegador.
 ### Características
 - 🔌 **Vista de MCPs** - Lista todos los MCPs configurados
 - 🏥 **Health Checks** - Verifica el estado de cada MCP
+- 💬 **Chat con Claudio** - Habla con Claudio directo desde el browser (WebSocket + Claude Code CLI)
 - 📚 **Documentación** - Acceso rápido a guías de integraciones
 - ⚡ **Workflows** - Lista de workflows disponibles
 - 🧠 **Contexto** - Visualiza el CLAUDE.md
@@ -333,6 +334,7 @@ Abre http://localhost:8000 en tu navegador.
 | `GET /api/mcps/health` | Health check de todos los MCPs |
 | `GET /api/mcps/{name}/health` | Health check de un MCP específico |
 | `GET /api/context` | Obtiene el CLAUDE.md |
+| `WS /ws/chat` | WebSocket para chat en tiempo real con Claudio |
 
 ---
 
@@ -360,5 +362,5 @@ Cuando revises o sugieras mejoras de UI/UX:
 4. **Prioridad**: Productividad del equipo > Perfección técnica
 5. **Bot de Telegram** - usa Claude Code CLI para ejecutar comandos
 6. **Bot de Slack** - mismo patrón que Telegram, soporta DMs y menciones
-7. **Web Dashboard** - interfaz para monitorear MCPs en http://localhost:8000
+7. **Web Dashboard** - interfaz para monitorear MCPs y chatear con Claudio en http://localhost:8000
 8. **Design System** - consulta `docs/design-system/reference.md` para reviews de UX/UI

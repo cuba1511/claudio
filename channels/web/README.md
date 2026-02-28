@@ -6,6 +6,7 @@ Interfaz web para monitorear y configurar Claudio.
 
 - 🔌 **Vista de MCPs** - Lista todos los MCPs configurados
 - 🏥 **Health Checks** - Verifica el estado de cada MCP
+- 💬 **Chat con Claudio** - Habla con Claudio directo desde el browser via WebSocket
 - 📚 **Documentación** - Acceso rápido a guías de integraciones
 - ⚡ **Workflows** - Lista de workflows disponibles
 - 🧠 **Contexto** - Visualiza el CLAUDE.md
@@ -34,6 +35,7 @@ Abre http://localhost:8000 en tu navegador.
 | `GET /api/docs/{type}` | Lista documentación (integrations/workflows) |
 | `GET /api/docs/read?path=...` | Lee un archivo de documentación |
 | `GET /api/context` | Obtiene el CLAUDE.md |
+| `WS /ws/chat` | WebSocket para chat con Claudio |
 
 ## Estados de Health Check
 
@@ -52,8 +54,10 @@ fastapi==0.109.0
 uvicorn[standard]==0.27.0
 jinja2==3.1.3
 python-multipart==0.0.6
+python-dotenv==1.0.1
 pyyaml==6.0.1
 httpx==0.26.0
+websockets==12.0
 ```
 
 ## Estructura

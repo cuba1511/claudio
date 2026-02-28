@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claudio - Chat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'claudio': {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        html, body { height: 100%; overflow: hidden; }
+
+        #chat-messages { scroll-behavior: smooth; }
+
+        .bubble-user {
+            background: linear-gradient(135deg, #0ea5e9, #0284c7);
+        }
+        .bubble-claudio {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+        }
+        .bubble-claudio pre {
+            background: #1e293b;
+            color: #e2e8f0;
+            border-radius: 8px;
+            padding: 14px;
+            overflow-x: auto;
+            font-size: 13px;
+            margin: 10px 0;
+        }
+        .bubble-claudio code:not(pre code) {
+            background: #f1f5f9;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #334155;
+        }
+        .bubble-claudio p { margin: 6px 0; line-height: 1.6; }
+        .bubble-claudio ul, .bubble-claudio ol { margin: 6px 0; padding-left: 22px; }
+        .bubble-claudio li { margin: 2px 0; }
+        .bubble-claudio h1, .bubble-claudio h2, .bubble-claudio h3 {
+            font-weight: 600; margin: 12px 0 6px;
+        }
+        .bubble-claudio h1 { font-size: 1.15em; }
+        .bubble-claudio h2 { font-size: 1.08em; }
+        .bubble-claudio h3 { font-size: 1em; }
+        .bubble-claudio a { color: #0284c7; text-decoration: underline; }
+        .bubble-claudio table { border-collapse: collapse; margin: 8px 0; font-size: 13px; }
+        .bubble-claudio th, .bubble-claudio td { border: 1px solid #e2e8f0; padding: 6px 10px; }
+        .bubble-claudio th { background: #f8fafc; font-weight: 600; }
+        .bubble-claudio blockquote {
+            border-left: 3px solid #0ea5e9;
+            margin: 8px 0;
+            padding: 4px 12px;
+            color: #64748b;
+        }
+
+        @keyframes typing-bounce {
+            0%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-6px); }
+        }
+        .typing-dot { animation: typing-bounce 1.4s infinite; }
+        .typing-dot:nth-child(2) { animation-delay: 0.15s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.3s; }
+
+        #chat-input {
+            field-sizing: content;
+            min-height: 48px;
+            max-height: 160px;
+        }
+
+        .sidebar-item {
+            transition: background 0.15s ease;
+        }
+        .sidebar-item:hover { background: rgba(255,255,255,0.08); }
+        .sidebar-item.active { background: rgba(255,255,255,0.12); }
+    </style>
+</head>
+<body class="h-full bg-gray-50 flex">
+
+    <!-- Sidebar -->
+    <aside class="w-64 bg-claudio-900 text-white flex flex-col flex-shrink-0">
+        <!-- Logo -->
+        <a href="/" class="flex items-center gap-3 px-5 py-4 border-b border-white/10 hover:bg-white/5 transition-colors">
+            <span class="text-2xl">🤖</span>
+            <div>
+                <h1 class="font-bold text-base leading-tight">Claudio</h1>
+                <p class="text-[11px] text-white/50">PropHero P&T</p>
+            </div>
+        </a>
+
+        <!-- New chat -->
+        <div class="px-3 pt-4 pb-2">
+            <button onclick="newChat()"
+                    class="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg border border-white/20 text-sm hover:bg-white/10 transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                Nueva conversación
+            </button>
+        </div>
+
+        <!-- Chat history -->
+        <nav class="flex-1 overflow-y-auto px-3 py-2 space-y-1" id="chat-history">
+            <div class="sidebar-item active rounded-lg px-3 py-2 cursor-pointer" id="current-chat-item">
+                <p class="text-sm truncate text-white/90" id="current-chat-title">Nueva conversación</p>
+                <p class="text-[11px] text-white/40 mt-0.5">Ahora</p>
+            </div>
+        </nav>
+
+        <!-- Bottom links -->
+        <div class="border-t border-white/10 p-3 space-y-1">
+            <a href="/" class="sidebar-item flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-white/70 hover:text-white">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                </svg>
+                Dashboard
+            </a>
+            <div class="flex items-center gap-2 px-3 py-2 text-[11px] text-white/30">
+                <div class="w-2 h-2 rounded-full" id="ws-indicator" style="background:#6b7280"></div>
+                <span id="ws-status-text">Conectando...</span>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main chat area -->
+    <main class="flex-1 flex flex-col min-w-0">
+        <!-- Header -->
+        <header class="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between flex-shrink-0">
+            <div class="flex items-center gap-3">
+                <span class="text-xl">🤖</span>
+                <div>
+                    <h2 class="font-semibold text-gray-900 text-sm">Claudio</h2>
+                    <p class="text-xs text-gray-400" id="header-status">Listo para ayudarte</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="text-xs text-gray-400" id="header-session">Sesión nueva</span>
+            </div>
+        </header>
+
+        <!-- Messages -->
+        <div id="chat-messages" class="flex-1 overflow-y-auto">
+            <div class="max-w-3xl mx-auto px-6 py-6 space-y-5" id="messages-container">
+                <!-- Welcome -->
+                <div class="flex gap-3 items-start">
+                    <div class="w-8 h-8 rounded-full bg-claudio-600 flex items-center justify-center flex-shrink-0 text-white text-sm font-bold">C</div>
+                    <div class="bubble-claudio rounded-2xl rounded-tl-md px-4 py-3 text-sm text-gray-800 max-w-[80%] shadow-sm">
+                        <p>Hola, soy <strong>Claudio</strong>, tu asistente de productividad.</p>
+                        <p>Tengo acceso a todos los MCPs configurados: GitHub, ClickUp, Slack, Google Docs, Sheets y más. Pregúntame lo que necesites.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Typing indicator -->
+        <div id="typing-indicator" class="hidden">
+            <div class="max-w-3xl mx-auto px-6 pb-2">
+                <div class="flex items-center gap-2 text-gray-400 text-xs">
+                    <div class="w-8 h-8 rounded-full bg-claudio-600 flex items-center justify-center flex-shrink-0 text-white text-sm font-bold">C</div>
+                    <span>Claudio está pensando</span>
+                    <span class="flex gap-1 ml-1">
+                        <span class="typing-dot w-1.5 h-1.5 bg-claudio-500 rounded-full inline-block"></span>
+                        <span class="typing-dot w-1.5 h-1.5 bg-claudio-500 rounded-full inline-block"></span>
+                        <span class="typing-dot w-1.5 h-1.5 bg-claudio-500 rounded-full inline-block"></span>
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Input area -->
+        <div class="border-t border-gray-200 bg-white px-6 py-4 flex-shrink-0">
+            <form onsubmit="sendMessage(event)" class="max-w-3xl mx-auto">
+                <div class="flex gap-3 items-end">
+                    <div class="flex-1 relative">
+                        <textarea id="chat-input"
+                            placeholder="Escribe tu mensaje a Claudio..."
+                            class="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-claudio-500 focus:border-transparent resize-none pr-12"
+                            rows="1"
+                            onkeydown="handleKeydown(event)"></textarea>
+                    </div>
+                    <button type="submit" id="send-btn"
+                            class="p-3 bg-claudio-600 text-white rounded-xl hover:bg-claudio-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+                            disabled>
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M12 5l7 7-7 7"></path>
+                        </svg>
+                    </button>
+                </div>
+                <p class="text-[11px] text-gray-400 mt-2 text-center">Enter para enviar · Shift+Enter para nueva línea · Usa Claude Code CLI con todos los MCPs</p>
+            </form>
+        </div>
+    </main>
+
+    <script>
+        marked.setOptions({
+            highlight: function(code, lang) {
+                if (lang && hljs.getLanguage(lang)) {
+                    return hljs.highlight(code, { language: lang }).value;
+                }
+                return hljs.highlightAuto(code).value;
+            },
+            breaks: true,
+            gfm: true
+        });
+
+        let ws = null;
+        let isProcessing = false;
+        let chunks = [];
+        let messageCount = 0;
+
+        function connectWs() {
+            const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
+            ws = new WebSocket(`${protocol}://${location.host}/ws/chat`);
+
+            ws.onopen = () => {
+                setStatus('connected');
+                document.getElementById('send-btn').disabled = false;
+            };
+            ws.onmessage = (e) => handleMessage(JSON.parse(e.data));
+            ws.onclose = () => {
+                setStatus('disconnected');
+                document.getElementById('send-btn').disabled = true;
+                setTimeout(connectWs, 3000);
+            };
+            ws.onerror = () => setStatus('error');
+        }
+
+        function setStatus(state) {
+            const dot = document.getElementById('ws-indicator');
+            const text = document.getElementById('ws-status-text');
+            const header = document.getElementById('header-status');
+            const colors = { connected: '#22c55e', disconnected: '#6b7280', error: '#ef4444' };
+            const labels = { connected: 'Conectado', disconnected: 'Desconectado', error: 'Error de conexión' };
+            dot.style.background = colors[state] || '#6b7280';
+            text.textContent = labels[state] || 'Desconocido';
+            if (state === 'connected') header.textContent = 'Listo para ayudarte';
+            else header.textContent = labels[state];
+        }
+
+        function handleMessage(data) {
+            switch (data.type) {
+                case 'start':
+                    isProcessing = true;
+                    chunks = [];
+                    document.getElementById('typing-indicator').classList.remove('hidden');
+                    document.getElementById('header-status').textContent = 'Procesando...';
+                    break;
+                case 'chunk':
+                    chunks.push(data.content);
+                    renderStreamingBubble();
+                    break;
+                case 'error':
+                    chunks.push(`\n⚠️ ${data.content}\n`);
+                    renderStreamingBubble();
+                    break;
+                case 'done':
+                    isProcessing = false;
+                    finalize(data.success);
+                    document.getElementById('header-status').textContent = 'Listo para ayudarte';
+                    document.getElementById('header-session').textContent = 'Sesión activa';
+                    document.getElementById('send-btn').disabled = false;
+                    document.getElementById('chat-input').disabled = false;
+                    document.getElementById('chat-input').focus();
+                    break;
+                case 'system':
+                    addSystemMsg(data.content);
+                    break;
+            }
+        }
+
+        function renderStreamingBubble() {
+            const container = document.getElementById('messages-container');
+            let bubble = document.getElementById('streaming-bubble');
+
+            if (!bubble) {
+                document.getElementById('typing-indicator').classList.add('hidden');
+                const wrapper = document.createElement('div');
+                wrapper.className = 'flex gap-3 items-start';
+                wrapper.innerHTML = `
+                    <div class="w-8 h-8 rounded-full bg-claudio-600 flex items-center justify-center flex-shrink-0 text-white text-sm font-bold">C</div>
+                    <div id="streaming-bubble" class="bubble-claudio rounded-2xl rounded-tl-md px-4 py-3 text-sm text-gray-800 max-w-[80%] shadow-sm"></div>
+                `;
+                container.appendChild(wrapper);
+                bubble = document.getElementById('streaming-bubble');
+            }
+
+            const raw = chunks.join('');
+            bubble.innerHTML = marked.parse(raw);
+            bubble.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
+            scrollToBottom();
+        }
+
+        function finalize(success) {
+            const bubble = document.getElementById('streaming-bubble');
+            if (bubble) {
+                bubble.removeAttribute('id');
+                if (!success && chunks.length === 0) {
+                    bubble.innerHTML = '<span class="text-red-500">Error ejecutando el comando.</span>';
+                }
+            }
+            document.getElementById('typing-indicator').classList.add('hidden');
+            chunks = [];
+        }
+
+        function sendMessage(e) {
+            e.preventDefault();
+            const input = document.getElementById('chat-input');
+            const text = input.value.trim();
+            if (!text || !ws || ws.readyState !== WebSocket.OPEN || isProcessing) return;
+
+            addUserBubble(text);
+            ws.send(JSON.stringify({ type: 'message', content: text }));
+            input.value = '';
+            input.style.height = 'auto';
+            document.getElementById('send-btn').disabled = true;
+            input.disabled = true;
+
+            messageCount++;
+            if (messageCount === 1) {
+                const title = text.length > 35 ? text.slice(0, 35) + '...' : text;
+                document.getElementById('current-chat-title').textContent = title;
+            }
+        }
+
+        function addUserBubble(text) {
+            const container = document.getElementById('messages-container');
+            const div = document.createElement('div');
+            div.className = 'flex gap-3 items-start justify-end';
+            div.innerHTML = `
+                <div class="bubble-user rounded-2xl rounded-tr-md px-4 py-3 text-sm text-white max-w-[80%] shadow-sm whitespace-pre-wrap">${escapeHtml(text)}</div>
+                <div class="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center flex-shrink-0 text-gray-600 text-sm font-bold">Tú</div>
+            `;
+            container.appendChild(div);
+            scrollToBottom();
+        }
+
+        function addSystemMsg(content) {
+            const container = document.getElementById('messages-container');
+            const div = document.createElement('div');
+            div.className = 'text-center text-xs text-gray-400 py-2';
+            div.textContent = `— ${content} —`;
+            container.appendChild(div);
+            scrollToBottom();
+        }
+
+        function newChat() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'new_session' }));
+            }
+            const container = document.getElementById('messages-container');
+            container.innerHTML = `
+                <div class="flex gap-3 items-start">
+                    <div class="w-8 h-8 rounded-full bg-claudio-600 flex items-center justify-center flex-shrink-0 text-white text-sm font-bold">C</div>
+                    <div class="bubble-claudio rounded-2xl rounded-tl-md px-4 py-3 text-sm text-gray-800 max-w-[80%] shadow-sm">
+                        <p>Nueva conversación. ¿En qué te puedo ayudar?</p>
+                    </div>
+                </div>
+            `;
+            messageCount = 0;
+            document.getElementById('current-chat-title').textContent = 'Nueva conversación';
+            document.getElementById('header-session').textContent = 'Sesión nueva';
+            document.getElementById('chat-input').focus();
+        }
+
+        function scrollToBottom() {
+            const el = document.getElementById('chat-messages');
+            el.scrollTop = el.scrollHeight;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function handleKeydown(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage(e);
+            }
+        }
+
+        connectWs();
+        document.getElementById('chat-input').focus();
+    </script>
+</body>
+</html>

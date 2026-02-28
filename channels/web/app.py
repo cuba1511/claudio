@@ -1,27 +1,44 @@
 """
 Claudio Web Dashboard
 =====================
-Interfaz web para monitorear MCPs y configurar contexto.
+Interfaz web para monitorear MCPs, chatear con Claudio y configurar contexto.
 """
 
 import json
 import os
+import re
 import subprocess
 import asyncio
+import logging
 from pathlib import Path
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Callable
 
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from dotenv import load_dotenv
+
+load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent.parent / ".env")
+
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
 
 # Paths
 BASE_DIR = Path(__file__).resolve().parent
 CLAUDIO_ROOT = BASE_DIR.parent.parent
 MCP_CONFIG_PATH = CLAUDIO_ROOT / "mcp" / "cursor-config.json"
 DOCS_PATH = CLAUDIO_ROOT / "docs"
+
+# Chat config from env
+CLAUDE_CLI_PATH = os.getenv('CLAUDE_CLI_PATH', 'claude')
+WORKSPACE_PATH = os.getenv('WORKSPACE_PATH', str(CLAUDIO_ROOT))
+COMMAND_TIMEOUT = float(os.getenv('COMMAND_TIMEOUT', '1800'))
+SKIP_PERMISSIONS = os.getenv('SKIP_PERMISSIONS', 'true').lower() == 'true'
 
 app = FastAPI(
     title="Claudio Dashboard",
@@ -30,6 +47,123 @@ app = FastAPI(
 )
 
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+
+# ============== CHAT ENGINE ==============
+
+def remove_ansi_codes(text: str) -> str:
+    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+    return ansi_escape.sub('', text)
+
+
+chat_sessions: dict[str, bool] = {}
+
+
+class ClaudeCodeExecutor:
+    """Ejecutor de Claude Code CLI con streaming via WebSocket."""
+
+    def __init__(self, workspace_path: str = None):
+        self.workspace_path = workspace_path or WORKSPACE_PATH
+        self.claude_path = CLAUDE_CLI_PATH
+
+    async def execute_streaming(
+        self,
+        query: str,
+        session_id: str,
+        continue_session: bool,
+        output_callback: Callable,
+        error_callback: Optional[Callable] = None
+    ) -> dict:
+        try:
+            cmd = [self.claude_path]
+
+            if continue_session and session_id in chat_sessions:
+                cmd.append('-c')
+
+            if SKIP_PERMISSIONS:
+                cmd.append('--dangerously-skip-permissions')
+
+            cmd.extend(['-p', query])
+
+            env = os.environ.copy()
+            env['PWD'] = self.workspace_path
+
+            logger.info(f"[Chat {session_id}] Ejecutando: {query[:80]}...")
+
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=self.workspace_path,
+                env=env
+            )
+
+            async def read_stream(stream, is_error=False):
+                buffer = b''
+                while True:
+                    chunk = await stream.read(1024)
+                    if not chunk:
+                        break
+                    buffer += chunk
+                    try:
+                        text = buffer.decode('utf-8', errors='replace')
+                        while '\n' in text:
+                            line, text = text.split('\n', 1)
+                            cleaned = remove_ansi_codes(line)
+                            if cleaned.strip():
+                                if is_error and error_callback:
+                                    await error_callback(cleaned)
+                                elif not is_error:
+                                    await output_callback(cleaned + '\n')
+                        buffer = text.encode('utf-8', errors='replace')
+                    except Exception as e:
+                        logger.error(f"[Chat {session_id}] Stream decode error: {e}")
+
+                if buffer:
+                    try:
+                        text = buffer.decode('utf-8', errors='replace')
+                        cleaned = remove_ansi_codes(text)
+                        if cleaned.strip():
+                            if is_error and error_callback:
+                                await error_callback(cleaned)
+                            elif not is_error:
+                                await output_callback(cleaned)
+                    except Exception:
+                        pass
+
+            try:
+                await asyncio.wait_for(
+                    asyncio.gather(
+                        read_stream(process.stdout, is_error=False),
+                        read_stream(process.stderr, is_error=True)
+                    ),
+                    timeout=COMMAND_TIMEOUT
+                )
+                returncode = await process.wait()
+            except asyncio.TimeoutError:
+                logger.warning(f"[Chat {session_id}] Timeout after {COMMAND_TIMEOUT}s")
+                process.kill()
+                await process.wait()
+                if error_callback:
+                    await error_callback(f"Timeout: el comando excedió {int(COMMAND_TIMEOUT)}s")
+                return {'success': False, 'returncode': -2, 'timeout': True}
+
+            if returncode == 0:
+                chat_sessions[session_id] = True
+
+            return {'success': returncode == 0, 'returncode': returncode}
+
+        except FileNotFoundError:
+            msg = f'Claude CLI no encontrado en: {self.claude_path}'
+            logger.error(msg)
+            if error_callback:
+                await error_callback(msg)
+            return {'success': False, 'returncode': -1}
+        except Exception as e:
+            msg = f'Error ejecutando comando: {str(e)}'
+            logger.error(msg, exc_info=True)
+            if error_callback:
+                await error_callback(msg)
+            return {'success': False, 'returncode': -1}
 
 
 def load_mcp_config() -> dict:
@@ -221,7 +355,66 @@ def get_workflows() -> list:
     return sorted(workflows, key=lambda x: x["name"])
 
 
+# ============== WEBSOCKET CHAT ==============
+
+@app.websocket("/ws/chat")
+async def websocket_chat(websocket: WebSocket):
+    await websocket.accept()
+    session_id = "web_default"
+    executor = ClaudeCodeExecutor()
+
+    try:
+        while True:
+            data = await websocket.receive_json()
+            msg_type = data.get("type", "message")
+
+            if msg_type == "new_session":
+                if session_id in chat_sessions:
+                    del chat_sessions[session_id]
+                await websocket.send_json({"type": "system", "content": "Nueva conversación iniciada."})
+                continue
+
+            if msg_type == "message":
+                query = data.get("content", "").strip()
+                if not query:
+                    continue
+
+                await websocket.send_json({"type": "start"})
+
+                async def on_output(text: str):
+                    await websocket.send_json({"type": "chunk", "content": text})
+
+                async def on_error(text: str):
+                    await websocket.send_json({"type": "error", "content": text})
+
+                continue_session = session_id in chat_sessions
+                result = await executor.execute_streaming(
+                    query, session_id, continue_session, on_output, on_error
+                )
+
+                await websocket.send_json({
+                    "type": "done",
+                    "success": result["success"],
+                    "returncode": result["returncode"]
+                })
+
+    except WebSocketDisconnect:
+        logger.info(f"[Chat {session_id}] WebSocket disconnected")
+    except Exception as e:
+        logger.error(f"[Chat {session_id}] WebSocket error: {e}", exc_info=True)
+        try:
+            await websocket.send_json({"type": "error", "content": str(e)})
+        except Exception:
+            pass
+
+
 # ============== ROUTES ==============
+
+@app.get("/chat", response_class=HTMLResponse)
+async def chat_page(request: Request):
+    """Página de chat a pantalla completa"""
+    return templates.TemplateResponse("chat.html", {"request": request})
+
 
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):
