@@ -15,7 +15,7 @@ echo "$(date '+%Y-%m-%d %H:%M:%S') - Starting monthly DS & AI report..." >> "$LO
 
 cd "$WORKSPACE"
 
-$CLAUDE_BIN -p "Genera el reporte mensual de DS & AI del mes anterior completo. Sigue el workflow definido en docs/workflows/monthly-ds-ai-report.md paso a paso:
+$CLAUDE_BIN --dangerously-skip-permissions -p "Genera el reporte mensual de DS & AI del mes anterior completo. Sigue el workflow definido en docs/workflows/monthly-ds-ai-report.md paso a paso:
 
 1. Calcula el rango de fechas del mes anterior automáticamente
 2. Pull Epics del quarter actual desde ClickUp (list 901215396098)
@@ -26,7 +26,6 @@ $CLAUDE_BIN -p "Genera el reporte mensual de DS & AI del mes anterior completo. 
 7. Crea un Google Doc con el reporte en la carpeta 1M7cqCebNXSJ-kcALWC3CVS44C6sAKcFo con nombre 'DS & AI Monthly Review — [Mes] [Año]'
 
 Usa formato estructurado con tablas, indicadores de status (🟢🟡🔴), y los colores de PropHero." \
-  --allowedTools "mcp__ClickUp__get_workspace_tasks,mcp__ClickUp__get_task,mcp__ClickUp__get_list,mcp__google-docs-mcp__createDocument,mcp__google-docs-mcp__editDocument,mcp__google-docs-mcp__readDocument" \
-  2>&1 | tail -30 >> "$LOG_FILE"
+  2>&1 | tee -a "$LOG_FILE"
 
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Monthly DS & AI report completed." >> "$LOG_FILE"

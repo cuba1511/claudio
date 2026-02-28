@@ -15,7 +15,7 @@ echo "$(date '+%Y-%m-%d %H:%M:%S') - Starting weekly bot report..." >> "$LOG_FIL
 
 cd "$WORKSPACE"
 
-$CLAUDE_BIN -p "Genera el reporte semanal del bot de WhatsApp usando los datos del spreadsheet Full Funnel Performance (ID: 1PI2NnSzDhxCrb-NY18WgEiNpQyujgSG0RkPCw4c7IM8, sheet 'Full Funnel metrics (ES) v2' y 'Bot metrics').
+$CLAUDE_BIN --dangerously-skip-permissions -p "Genera el reporte semanal del bot de WhatsApp usando los datos del spreadsheet Full Funnel Performance (ID: 1PI2NnSzDhxCrb-NY18WgEiNpQyujgSG0RkPCw4c7IM8, sheet 'Full Funnel metrics (ES) v2' y 'Bot metrics').
 
 Incluye estas métricas para la última semana completa vs la semana anterior:
 1. Total de Group Calls bookeadas por el bot, con % respecto a no booked y respecto a total GC booked
@@ -24,7 +24,6 @@ Incluye estas métricas para la última semana completa vs la semana anterior:
 4. Bot Activity: mensajes enviados, success rate, reply rate, bot response rate
 
 Manda el reporte por email en formato HTML con tablas a ignacio.delacuba@prophero.com con asunto 'Reporte Semanal Bot - Full Funnel Performance'. Usa los colores de PropHero (primary #2050f6)." \
-  --allowedTools "mcp__google-docs-mcp__readSpreadsheet,mcp__google-docs-mcp__getSpreadsheetInfo,mcp__gmail__send_email" \
-  2>&1 | tail -20 >> "$LOG_FILE"
+  2>&1 | tee -a "$LOG_FILE"
 
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Weekly bot report completed." >> "$LOG_FILE"
