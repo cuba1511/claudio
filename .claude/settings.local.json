@@ -40,7 +40,13 @@
       "mcp__ClickUp__get_workspace_hierarchy",
       "Bash(xargs:*)",
       "Bash(gh repo list:*)",
-      "Bash(claude mcp:*)"
+      "Bash(claude mcp:*)",
+      "mcp__google-docs-mcp__insertText",
+      "mcp__google-docs-mcp__applyTextStyle",
+      "Bash(CLICKUP_API_KEY=\"pk_81701809_WFLE699CJCQYSNH5GN9BQA0YWH6L8MWJ\" python3:*)",
+      "mcp__ClickUp__get_list",
+      "Bash(curl:*)",
+      "mcp__ClickUp__update_task"
     ]
   },
   "enableAllProjectMcpServers": true,
