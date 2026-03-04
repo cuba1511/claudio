@@ -22,8 +22,8 @@ fi
 # Start server
 if [ "$1" == "--dev" ]; then
     echo "🚀 Starting Claudio Dashboard in development mode..."
-    uvicorn app:app --reload --host 0.0.0.0 --port 8000
+    uvicorn app:app --reload --host 0.0.0.0 --port 8001
 else
     echo "🚀 Starting Claudio Dashboard..."
-    uvicorn app:app --host 0.0.0.0 --port 8000
+    uvicorn app:app --host 0.0.0.0 --port 8001
 fi
