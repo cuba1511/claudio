@@ -5,6 +5,9 @@
 
 set -e
 
+export HOME="/Users/ignaciodelacuba"
+export PATH="$HOME/.local/bin:$HOME/.nvm/versions/node/$(ls $HOME/.nvm/versions/node 2>/dev/null | tail -1)/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+
 WORKSPACE="/Users/ignaciodelacuba/Dev/claudio"
 CLAUDE_BIN="/Users/ignaciodelacuba/.local/bin/claude"
 LOG_FILE="$WORKSPACE/scripts/logs/weekly-bot-report.log"
