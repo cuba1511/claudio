@@ -69,17 +69,49 @@ crontab -e
 
 ```
 claudio/
-├── CLAUDE.md              # Identity and instructions
-├── docs/                  # Brain — documentation and guides
-│   ├── images/            # Assets (architecture diagram)
-│   ├── integrations/      # Guide per MCP (clickup, github, slack, etc.)
-│   ├── workflows/         # Multi-MCP workflows
-│   │   ├── product/       # daily-standup, create-initiative, sprint-report
-│   │   └── revenue/       # funnel-master, hook-script-creator
-│   └── design-system/     # PropHero design system reference
-├── mcp/                   # Hands — MCP configuration
-├── channels/              # Mouths — interfaces (telegram, slack, web)
-└── scripts/               # Automated cron jobs
+├── CLAUDE.md                          # Identity and instructions
+├── README.md                          # This file
+├── requirements.txt                   # Python dependencies
+├── .env.example                       # Environment variables template
+│
+├── docs/                              # Brain — documentation and guides
+│   ├── README.md                      # Docs index
+│   ├── INITIATIVE_CLAUDIO.md          # Project initiative definition
+│   ├── images/                        # Assets (architecture diagram)
+│   ├── design-system/                 # PropHero design system reference
+│   │   └── reference.md
+│   ├── integrations/                  # Guide per MCP
+│   │   ├── terminal.md
+│   │   ├── clickup/                   # config, guide, templates (initiative, epic, user-story)
+│   │   ├── github/
+│   │   ├── google-docs/
+│   │   ├── google-sheets/
+│   │   ├── granola/
+│   │   └── slack/
+│   └── workflows/                     # Multi-MCP workflows
+│       ├── weekly-bot-report.md       # Cron-based workflows
+│       ├── monthly-ds-ai-report.md
+│       ├── product/                   # daily-standup, create-initiative, sprint-report
+│       └── revenue/                   # funnel-master, hook-script-creator
+│
+├── mcp/                               # Hands — MCP configuration
+│   ├── cursor-config.json             # MCP config for Cursor IDE
+│   ├── claude-code-config.example.json
+│   └── servers/                       # Server-specific docs
+│
+├── channels/                          # Mouths — interfaces
+│   ├── telegram/                      # bot.py, start.sh, requirements.txt
+│   ├── slack/                         # bot.py, start.sh, requirements.txt
+│   └── web/                           # FastAPI dashboard + chat
+│       ├── app.py
+│       ├── start.sh
+│       └── templates/                 # dashboard.html, chat.html
+│
+└── scripts/                           # Automated cron jobs
+    ├── weekly-bot-report.sh
+    ├── monthly-ds-ai-report.sh
+    ├── kill_bot_processes.sh
+    └── logs/                          # Script execution logs
 ```
 
 ---
