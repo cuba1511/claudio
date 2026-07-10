@@ -339,20 +339,24 @@ def get_integration_docs() -> list:
 
 
 def get_workflows() -> list:
-    """Obtiene la lista de workflows disponibles"""
+    """Obtiene la lista de workflows disponibles (incluye subcarpetas)."""
     workflows = []
     workflows_path = DOCS_PATH / "workflows"
-    
+
     if workflows_path.exists():
-        for item in workflows_path.iterdir():
-            if item.suffix == ".md" and item.name != "README.md":
-                workflows.append({
-                    "name": item.stem.replace("-", " ").title(),
-                    "path": str(item.relative_to(CLAUDIO_ROOT)),
-                    "filename": item.name
-                })
-    
-    return sorted(workflows, key=lambda x: x["name"])
+        for item in sorted(workflows_path.rglob("*.md")):
+            if item.name == "README.md":
+                continue
+            relative = item.relative_to(workflows_path)
+            category = str(relative.parent) if relative.parent != Path(".") else "general"
+            workflows.append({
+                "name": item.stem.replace("-", " ").title(),
+                "path": str(item.relative_to(CLAUDIO_ROOT)),
+                "filename": item.name,
+                "category": category.replace("\\", "/"),
+            })
+
+    return sorted(workflows, key=lambda x: (x["category"], x["name"]))
 
 
 # ============== WEBSOCKET CHAT ==============
