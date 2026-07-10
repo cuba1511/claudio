@@ -18,6 +18,7 @@ Configuración de Model Context Protocol (MCP) servers para Claudio.
 | **Slack** | npx package | Comunicación |
 | **Google Docs** | Local server | Documentación |
 | **Granola** | Python module | Meeting notes |
+| **Notion** | OAuth HTTP | Experimentos Growth, documentación |
 
 ## Setup
 
@@ -40,6 +41,7 @@ Configuración de Model Context Protocol (MCP) servers para Claudio.
 - **ClickUp**: Requiere licencia del MCP server
 - **Granola**: Requiere app de Granola instalada
 - **Google Docs**: Requiere OAuth setup (ver `docs/integrations/google-docs/guide.md`)
+- **Notion**: OAuth en primer uso vía `https://mcp.notion.com/mcp` (ver `docs/integrations/notion/guide.md`)
 
 ## Servidores Custom
 

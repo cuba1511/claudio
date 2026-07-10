@@ -22,13 +22,18 @@ docs/
 │   ├── google-docs/guide.md        ← Documentacion
 │   ├── google-sheets/guide.md      ← Datos y reportes
 │   ├── granola/guide.md            ← Meeting notes
+│   ├── notion/
+│   │   ├── config.md               ← IDs, stakeholders, lifecycle
+│   │   ├── guide.md                ← Experiments DB + MCP
+│   │   └── templates/
+│   │       └── experiment.md
 │   └── terminal.md                 ← Comandos locales
 │
 ├── workflows/                       ← Workflows multi-MCP
-│   ├── README.md
-│   ├── daily-standup.md
-│   ├── create-initiative.md
-│   └── sprint-report.md
+│   ├── product/                    ← P&T squad
+│   ├── growth/                     ← Experimentos Notion
+│   ├── revenue/                    ← Funnel y copy
+│   └── ...
 │
 └── design-system/
     └── reference.md                 ← Design system de PropHero
@@ -57,9 +62,9 @@ Configuracion especifica de ClickUp para PropHero:
 
 ### docs/workflows/
 Workflows que combinan multiples MCPs:
-- Daily Standup (Slack + Google Docs)
-- Create Initiative (ClickUp + Google Docs)
-- Sprint Report (ClickUp + Slack + Sheets)
+- **product/** — Daily Standup, Create Initiative, Sprint Report
+- **growth/** — Create/Review/Update/Conclude experiments (Notion)
+- **revenue/** — Funnel Master, Hook Script Creator
 
 ### docs/design-system/
 Referencia del Design System de PropHero para reviews de UI/UX.

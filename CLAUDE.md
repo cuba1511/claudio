@@ -46,7 +46,7 @@ Definition → Initiative → Epic → User Story → Execution
 
 ### MCPs Disponibles
 ```
-GitHub | Docs | Slack | ClickUp | Sheets | Gmail | Granola | Slides
+GitHub | Docs | Slack | ClickUp | Sheets | Gmail | Granola | Slides | Notion
 ```
 
 ---
@@ -74,13 +74,21 @@ claudio/
 │   │   ├── google-docs/guide.md
 │   │   ├── google-sheets/guide.md
 │   │   ├── granola/guide.md
+│   │   ├── notion/
+│   │   │   ├── config.md               # IDs, stakeholders, lifecycle
+│   │   │   ├── guide.md
+│   │   │   └── templates/
+│   │   │       └── experiment.md
 │   │   └── terminal.md
 │   │
 │   └── workflows/                      # Workflows multi-MCP
-│       ├── README.md
-│       ├── daily-standup.md
-│       ├── create-initiative.md
-│       └── sprint-report.md
+│       ├── product/
+│       ├── growth/
+│       ├── revenue/
+│       └── ...
+│
+├── .claude/skills/
+│   └── experiment-manager/SKILL.md     # Modo Growth
 │
 ├── mcp/                                # MANOS - Config MCPs
 │   ├── README.md
@@ -123,8 +131,9 @@ claudio/
 | **ClickUp** | Product Management (Initiatives, Epics, User Stories) | npx package | `docs/integrations/clickup/` |
 | **GitHub** | Código, PRs, Issues (requiere GitHub Copilot) | Remote URL | `docs/integrations/github/` |
 | **Slack** | Comunicación, notificaciones | npx package | `docs/integrations/slack/` |
-| **Google Docs/Sheets** | Documentación y datos | Local server | `docs/integrations/google-docs/` |
+| **Google Docs/Sheets** | Documentación y datos | npx @a-bonus/google-docs-mcp | `docs/integrations/google-docs/` |
 | **Granola** | Meeting notes, transcripciones | Python module | `docs/integrations/granola/` |
+| **Notion** | Experimentos Growth, documentación | OAuth HTTP MCP | `docs/integrations/notion/` |
 
 Ver configuración completa en `mcp/cursor-config.json` o `mcp/claude-code-config.example.json`
 
@@ -137,8 +146,12 @@ Ver configuración completa en `mcp/cursor-config.json` o `mcp/claude-code-confi
 | **Daily Standup** | Google Docs + Slack | "Crea las notas para la daily" |
 | **Create Initiative** | ClickUp + Google Docs | "Crea una initiative para X" |
 | **Sprint Report** | ClickUp + Google Sheets + Slack | "Genera el reporte del sprint" |
+| **Create Experiment** | Notion | "Crea un experimento para..." |
+| **Experiment Review** | Notion | "Prepárame la review de experimentos" |
+| **Update Experiment** | Notion | "Actualiza el experimento X" |
+| **Conclude Experiment** | Notion | "Cierra el experimento X" |
 
-Ver detalles en `docs/workflows/`
+Ver detalles en `docs/workflows/` (product/, growth/, revenue/)
 
 ---
 
@@ -180,6 +193,45 @@ mostrar_borrador: siempre
 - SIEMPRE mostrar borrador del mensaje antes de enviar
 - Esperar confirmación del usuario
 
+### Contexto de Hilos de Slack
+Cuando recibes un mensaje desde un hilo de Slack, el prompt incluye el contexto completo del hilo (mensajes previos) delimitado por `--- CONTEXTO DEL HILO DE SLACK ---`.
+
+**Reglas clave:**
+1. **USA el contexto del hilo**: Si el usuario dice "esta sugerencia", "este feedback", "lo anterior", etc., la información está en los mensajes previos del hilo. NO pidas que te la repitan.
+2. **Sé directo, ejecuta**: Cuando el usuario pide crear algo (user story, tarea, etc.) y el contexto está claro en el hilo, construye la tarea y créala. No hagas preguntas innecesarias.
+3. **Feedback de InvestMap**: Si el feedback/sugerencia es sobre InvestMap, créalo en la lista `901216076560` (InvestMap Feedback). Ver `docs/integrations/clickup/config.md`.
+4. **Solo pregunta lo esencial**: Si realmente falta información crítica (ej: no hay forma de saber a qué producto se refiere), pregunta de forma concisa con opciones.
+
+### Modo Growth (Experimentos)
+```yaml
+confirmar_antes: true
+buscar_contexto: siempre
+template: usar_siempre
+fuente_verdad: Notion Ideas-Experiments DB
+skill: .claude/skills/experiment-manager/SKILL.md
+```
+
+**Qué hacer**:
+- SIEMPRE leer `docs/integrations/notion/config.md` antes de crear o actualizar experimentos
+- SIEMPRE usar el template `docs/integrations/notion/templates/experiment.md`
+- SIEMPRE documentar los 4 pilares: Problema, Hipótesis, Métricas, Metodología
+- Calcular sign-offs según Area + Tags (stakeholder map en config.md)
+- En reviews de reunión: priorizar experimentos con sign-off pendiente
+- Mostrar borrador y confirmar antes de escribir en Notion
+- Devolver siempre el link de la página Notion
+
+**Qué NO hacer**:
+- Crear experimento sin los 4 pilares
+- Pasar a `Running` sin todos los sign-offs requeridos en `Approved`
+- Inventar IDs de Notion — usar los de `docs/integrations/notion/config.md` o `notion-fetch` en vivo
+- Ignorar contexto de hilo Slack si mencionan "este experimento"
+
+**Triggers rápidos**:
+- "Crea un experimento para..."
+- "Prepárame la review de experimentos"
+- "¿Qué experimentos necesitan sign-off?"
+- "Actualiza / cierra el experimento X"
+
 ---
 
 ## Estructura de Respuestas
@@ -211,6 +263,20 @@ Para IDs actualizados, ver `docs/integrations/clickup/config.md`
 | Query Initiatives | `901213053436` | P&T - General |
 | Query Epics (Q1 2026) | `901215396098` | Cambiar cada quarter |
 | Create User Stories | `901213056238` | Sprint Backlog |
+| InvestMap Feedback | `901216076560` | Sugerencias/feedback de InvestMap |
+
+---
+
+## Quick Reference: Notion (Growth)
+
+Ver `docs/integrations/notion/config.md` para IDs actualizados.
+
+| Acción | Recurso | Notas |
+|--------|---------|-------|
+| Experiments DB | Ideas-Experiments | URL en config.md |
+| Template | `templates/experiment.md` | Body obligatorio de cada experimento |
+| Skill | `.claude/skills/experiment-manager/` | Comportamiento Growth |
+| Sign-offs | `config.md` stakeholder map | Area + Tags activan stakeholders |
 
 ---
 

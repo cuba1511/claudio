@@ -41,6 +41,9 @@
             "SLACK_MCP_XOXD_TOKEN": "xoxd-YOUR_TOKEN",
             "SLACK_MCP_ADD_MESSAGE_TOOL": "true"
           }
+        },
+        "notion": {
+          "url": "https://mcp.notion.com/mcp"
         }
       }
     }
