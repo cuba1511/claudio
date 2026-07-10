@@ -1,0 +1,112 @@
+Title,Sponsor,Category,Description,Expected Impact,P&T Team
+Gestoría Digital: verificación documental,Jose Juan Gimenez Padilla,Settlements,"As a Settlements member, I want the system to automatically extract and validate data from documents uploaded by the Investor and Seller
+So that I can verify completeness and accuracy without manual review of each document.
+
+When an Investor or Seller uploads a document (DNI/NIE, escritura, nota simple, etc.), the system runs OCR extraction automatically — no manual trigger required
+Extracted fields are displayed to the Ops Team in a structured review panel with confidence scores per field
+Fields with confidence score below threshold (TBD — suggest 85%) are flagged for manual review
+If a required field is missing or unreadable, the document status is set to INCOMPLETE and the uploader is notified
+If all required fields pass validation, document status is set to VERIFIED","Tiempo de verificación por expediente: de ~45-60 min manual a ~5-10 min (revisión de flags solamente). 
+Error rate en transcripción manual: debería bajar a casi 0 en campos extraídos correctamente.
+Primer paso hacia la creación de gestoría digital que nos daría más control de las operaciones y de los timings.
+Time-to-verified: depende más del flujo completo (cuándo sube el documento el Investor, cuándo lo revisa Ops) que del OCR en sí.",Engineering
+Management Dashboards en Vistral,Juan Gramaje Vega,Finance,"As a Finance Team member, I want a Vistral dashboard that replicates and improves our Reporting Dashboards
+so that I can monitor KPIs in real-time and generate board-ready reports without touching a spreadsheet
+
+Dashboard loads all KPI sections currently covered in the Excel (revenue, costs, margins — exact tabs TBD once Excel is accessible)
+Each KPI shows current value vs previous period
+Finance team can filter by time period (month / quarter / year)
+Data source is the existing Excel (Google Sheets sync or manual CSV upload as interim)
+No editing capability — read-only view
+Loads in under 3 seconds on Vercel",Replaces a manual Excel process with a real-time dashboard. Finance saves maybe 5-10h/month on report prep. Board meetings get cleaner visuals. Improves our perception as a tech company.,Data Analytics
+Modelo de pricing para obra nueva,PAU GARCIA,New Building,"As a New Buildings member, I want to create and configure a pricing model for a building based on zone, typology, sales phase, floor height, and other modifiers
+So that I can generate accurate unit prices without manual spreadsheet calculations
+
+The user can create a new building record with basic metadata (name, location, market)
+The user can define pricing dimensions per building: base price per m², zone modifier, typology (studio / 1BR / 2BR / 3BR+), sales phase (pre-launch / launch / phase 2…), floor height premium, and orientation modifier
+Each modifier can be set as a fixed value (€) or a percentage (%)
+The system calculates and previews the final unit price in real time as modifiers are configured
+The user can save a pricing model as a draft (inactive) or activate it
+Only one pricing model can be active per building at a time — activating a new one auto-archives the previous
+The user can duplicate an existing pricing model to create a variant","Eficiencia operativa: El ahorro más obvio. Si configurar precios para un edificio toma horas en Excel (consolidar tipologías, fases, plantas, orientaciones, recalcular todo cuando cambia un modifier) — eso colapsa a minutos. Cuantificable en horas/semana una vez que sepas cuántos edificios gestionan y con qué frecuencia actualizan precios.
+
+Reducción de errores de pricing: ""A ojo"" en Excel con múltiples modifiers = errores humanos garantizados. Un precio mal calculado en una venta de obra nueva puede significar márgenes incorrectos o conflictos con el promotor. Este es el impacto más difícil de cuantificar pero potencialmente el más caro.
+
+Velocidad de respuesta comercial: Si un promotor pide ajustar precios por fase o lanzar una nueva fase, hoy probablemente tarda días (alguien tiene que actualizar la hoja, validar, distribuir). Con esto es inmediato.",Data Science
+Investor Relations Agent,Agustina García,Investor Relations,"As an Investor Relations team member, I want an AI agent to read an incoming investor email, pull that investor's last N interactions from HubSpot, and generate a draft reply in Gmail
+So that I can respond faster with accurate, context-aware answers without manually digging through the CRM. 
+
+When a new email arrives in the IR Gmail inbox, the agent identifies the sender's email address and matches it to a HubSpot contact
+If a match is found, the agent retrieves the last 10 interactions (emails, notes, calls) from that contact's HubSpot timeline
+The agent reads the full email thread (not just the latest message) to understand context
+The agent generates a draft reply and saves it to Gmail Drafts — it never sends automatically
+The draft is grounded in CRM history — references the investor's portfolio, open questions, or last interaction where relevant
+If no HubSpot contact match is found, the agent creates the draft anyway with a [NO CRM MATCH] flag in the subject line
+Complaints (emails containing specific trigger words: ""unhappy"", ""complaint"", ""issue"", ""problem"", ""disappointed"") are skipped — no draft is generated, a Slack notification is sent to the IR lead instead
+Draft tone follows PropHero voice: direct, reassuring, specific — no generic filler","
+Time saved per IR team member: Drafting a context-aware investor reply takes ~15–20 min manually (finding the contact, reading history, writing). With the agent, review + edit drops to ~3–5 min.",Engineering
+Pre-settlement - Voice Agent,,Pre-settlements,"As a Closer, I want investors to automatically receive a voice call 10 minutes before their scheduled meeting so that no-show rate drops and closers don't waste calendar slots.
+System detects HubSpot meetings scheduled with a Closer and triggers a call exactly 10 min before start time.
+ElevenLabs voice call plays a reminder with the investor's name, meeting time, and Closer's name.
+If the investor doesn't pick up, the system retries once after 2 minutes and logs the outcome.
+Call outcome (answered / no answer / failed) is logged back to the HubSpot contact record as a note or activity.
+Closers can see call status in HubSpot before the meeting starts (answered = likely showing, no answer = flag).
+If a meeting is cancelled or rescheduled in HubSpot with more than 15 min notice, the call is cancelled automatically.",20–40% reduction in no-shows.,Engineering
+Subscription's invoices ,Jacobo Granero,Rentals,"As an Rentals Team member, I want the subscription billing process to run automatically — reconciling payments from Stripe, and pushing invoices to Business Central with the correct billing logic applied so that I don't have to do this manually each month and billing errors are eliminated
+
+Each transaction is cross-referenced against Stripe payment data; the reconciliation result (matched / unmatched) is reflected in the tracking dashboard
+Billing dates are assigned following the logic: subscribers who activate on day 20 or later → first invoice on the 5th of the following month; subscribers who activate on days 1–19 → billing date is the 20th of each month
+The Stripe charge date (tied to the investor's first payment date) is stored independently from the billing date — the two are never conflated
+Reconciled and validated records are pushed to Business Central automatically, with the correct billing dates pre-applied
+Any unmatched or failed reconciliations surface as alerts in the tracking dashboard, with enough detail to resolve manually
+The full pipeline runs on a monthly schedule (or can be triggered manually by Rentals)","~14-18 hours/month of manual Rentals work, and more importantly, the human error surface on billing date logic (which is where mistakes cost money — wrong invoice dates, disputes, BC reconciliation headaches).","RevOps, Engineering"
+"""Reservation contratct"" instead of ""Arras""",María Concheso,Settlements,"PropHero Advisory cannot purchase properties, as it is not within its corporate purpose - therefore, it cannot subscribe ""Arras""
+In transactions subject to VAT, the earnest money must also include VAT (Art. 75 LIVA), which means PH must pay it without later receiving the corrective invoice when the buyer is subrogated, potentially even affecting different fiscal years.
+In practice, the transfer of arras to the client/buyer is not being correctly notified in most cases, meaning PropHero would be liable to the seller until the sale is completed.
+We can give the seller the same amount currently delivered as earnest money to reserve the property.
+
+Proposal for a new model - Adopt a reservation contract with real estate intermediation, in which PH delivers an amount as a reservation fee and the seller is obligated to sign an earnest money contract, agreed upon with PH, directly with the buyer so when the buyer signs the contratct, the seller returns the money to PH (even - allowing for interest or penalties to be agreed upon in case of delay, and even allowing the operation to be halted if this return is not fulfilled).","- Shift to a process that is better aligned with our real corporate purpose 
+- Avoid taxes at the previous payments",Legal 
+Deposit ,María Concheso,Settlements,Create a trust/escrow account to collect the arras and the purchase price in advance of the sale,"- Reduces the client’s OMF transfer fees
+- Greater control of the transaction by the settlement team
+- A better snapshot of PropHero’s cash position",Finance
+Partner Bid Portal Construction tender,Jorge Navarro,Renovations,"A bidding portal where PropHero publishes open construction tenders. Partners can see the base price and submit their offer. The winning bid is not revealed during the process. Automated notifications are sent at 24h, 12h, 6h, and 1h before closing, revealing the current lowest bid to increase competitiveness. Ops team manages tender publication and closing from backoffice.",Reduces cost of construction works through competitive pricing. Eliminates manual negotiation overhead. Increases partner engagement.,Engineering/Product
+Pre Settlement Document Review Agent,David Gras Fanego,Settlements,"An AI agent that runs in the background prior to settlement. It automatically retrieves all property documents, extracts key data, and validates them against settlement requirements. If errors or missing information are detected, the agent flags them and delivers a curated, pre-validated document summary directly to the Settlements team — so they start each case ready to act, not to search.","Reduces manual document review time per settlement. Decreases error rate at settlement stage. Frees Settlements team to focus on resolution, not discovery.",AI 
+Value Partner VIP Portal,Irene Hoyos Iborra ,Wealth,"A dedicated portal for Value Partners and their assigned Asset Managers. Displays real-time metrics per partner: total invested, properties sold, active works, process status per project, and financial flows. Asset Managers can track progress on each obra or process directly. Partners get full visibility of their portfolio performance in one place.",Increases Value Partner retention and trust. Reduces ad-hoc reporting requests to Asset Managers. Positions PropHero as a premium partner platform.,Engineering/Product
+Rentals - Suscriptions Investor Portal,Jacobo Granero,Rentals,Rentals - Suscriptions Investor Portal,,
+Suscriptions - Free Users Portal,Jacobo Granero,Rentals,Suscriptions - Free Users Portal,"Upselling current leads:
+1) Growth
+- XX Leads con propiedades a PH a invertir x y% conversion rate para gestionar.
+- NN AuMs que generan - XXX ARR + YY TSF + Cross Selling
+- 
+2) Operations/Scalability (horas saved vs. manual work vs. CX)
+
+New Biz:
+- Marketing bringing new leads
+",
+Suscription - Debt Recovery,Jacobo Granero,Rentals,Suscription - Debt Recovery,,
+ETL - Hubspot vs. AT,Jacobo Granero,Rentals,,,
+Plataforma Facturación Partners,Jacobo Granero,Rentals,"Partner Invoicing Platform
+
+A web platform that automates invoice management: the partner uploads a PDF and fills out a simple form (Partner, invoice type, and applicable dates). The system then analyzes the file, renames it, organizes it into the correct folder in Google Drive, extracts key data (date, company, amount, concept), and stores everything in an organized way both as a file in Drive and as structured data in Google Sheets as a unified database (since each partner submits invoices in different formats). It also helps detect duplicates.
+
+The goal is to eliminate manual invoice handling. For example, if by the 20th of the month an invoice from a specific partner has not been received, an automatic email reminder can be sent ahead of accounting close. This system centralizes and structures all information, making it ready for cost review (theoretical vs. actual), solving the current issue of not having a simple way to verify invoice amounts upon arrival.","Better cost analysis, tracking of invoice data entry, and improved overall control.",Rentals
+Forecasting Tool,Jacobo Granero,Rentals,"Operations forecasting tool - Reno end date, final check date, etc....",,
+,,,AT Police across Operations - Ensure Data Quality,,
+Divestment valuation tool,David Gras Fanego PAULA SABARIEGO ALONSO,Supply,"Automated valuation tool - NB, divestments, buildings, projects",,
+Divestment report tool,PAULA SABARIEGO ALONSO,Supply,"As a project approaches its final stages is relevant start preparing and providing key insights to Value Partners, VHs, etc...",,
+Post-selling platform (B2C & B2B),David Gras Fanego PAULA SABARIEGO ALONSO,Supply,platform that gathers all clients (investors and final users) to provide 10x post-selling services,,
+Vistral Supply Control Tower,,Supply ,"Creation of a cross-functional control panel that centralizes all Vistral supply data (origin, property typology, and projects). This solution is designed to connect business strategy with operational execution: it allows the Product/Tech team to develop with a focus on real market trends, while offering leadership and the entire company a transparent window into the current inventory and company growth.",,
+Smart RenoBot,,Reno,"How many hours a week does our team waste searching for key information among hundreds of WhatsApp messages? Project Pulse AI is a silent ""watchdog"" for our site coordination groups.
+
+By introducing this AI bot into communication groups, we transform unstructured conversations into actionable data. The AI processes the natural language of contractors and cleaning crews, identifies critical updates, and sends summaries and emergency alerts directly to Vistral's dashboards or management systems.
+
+Key benefits: We shift from reactive communication (reading chats to see what happens) to proactive management (the system notifies us only when we are needed).",,
+Zero-Touch Utilities,,Post-settlement,"Vistral's growth cannot rely on manual ""copy and paste"" processes. Zero-Touch Utilities transforms the tedious task of setting up electricity or water into an invisible, automated workflow.
+
+By integrating our current tools (Airtable + Contracts), we will create a system that detects when a property is ready for utility activation and automatically triggers emails to providers (e.g., Iberdrola) with all the necessary technical and legal information. We transition from heavy administrative work to a scalable system that effortlessly supports our business volume, no matter how many properties we add to the portfolio.",,
+People Software for PH,,People,"Development of a centralized, proprietary HR management platform tailored to PropHero's specific organizational chart. This solution directly solves the management struggle of tracking employee vacations, absences, and working hours. By consolidating these functions into a single, custom-built interface, we streamline approvals, ensure accurate timekeeping compliance, and provide leadership with clear visibility into team availability across all departments.",,
+Compensation Tool,,Rents,,,
+Automatic Drat Purchase Public Deeds,María Concheso,Settlements,"Automate the drafting of sale‑and‑purchase deed templates using the seller’s previous deed, updated land registry extracts, and financial information.",To have the draft of the sale‑and‑purchase deed ready from the moment the earnest‑money contract is signed with the seller,
+Whatsapp/Slack Comm Centralizer,,Rents,Centralize  daily communications in a single portal,,
+Block the contracts ,María Concheso,supply,"Find a software solution that allows a contract to be locked, so that only certain fields — such as the price and the seller’s details — can be entered, select predefined options depending on the case (rented, recently renovated, etc.), and require the signature of an authorizing party who verifies that the information is correct before the administrator signs, which must always be the final signature",to ensure uniformity in the signing of contracts and the certainty that they are not altered by each seller,

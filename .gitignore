@@ -21,3 +21,6 @@ ENV/
 # Logs
 *.log
 .claude/settings.local.json
+
+# AlphaEngine local SQLite
+alphaengine/prophero_ideas.db
