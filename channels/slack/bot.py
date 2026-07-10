@@ -190,6 +190,65 @@ def check_rate_limit(user_id: str) -> tuple[bool, float]:
     return True, 0
 
 
+def fetch_thread_context(channel: str, thread_ts: str, current_ts: str = None) -> str:
+    """Recupera los mensajes previos del hilo para dar contexto a Claude.
+
+    Args:
+        channel: ID del canal
+        thread_ts: Timestamp del hilo (mensaje padre)
+        current_ts: Timestamp del mensaje actual (para excluirlo)
+
+    Returns:
+        String con el contexto del hilo formateado, o cadena vacía si no hay contexto.
+    """
+    try:
+        result = app.client.conversations_replies(
+            channel=channel,
+            ts=thread_ts,
+            limit=50  # Últimos 50 mensajes del hilo
+        )
+
+        messages = result.get("messages", [])
+        if len(messages) <= 1:
+            # Solo está el mensaje padre o el actual, no hay contexto adicional
+            return ""
+
+        context_parts = []
+        for msg in messages:
+            msg_ts = msg.get("ts", "")
+            # Excluir el mensaje actual (se enviará como prompt principal)
+            if current_ts and msg_ts == current_ts:
+                continue
+
+            # Excluir mensajes del bot (respuestas de Claudio)
+            if msg.get("bot_id"):
+                sender = "Claudio"
+            else:
+                sender = f"Usuario <@{msg.get('user', 'desconocido')}>"
+
+            text = msg.get("text", "").strip()
+            if text:
+                # Limpiar menciones del bot del texto
+                if BOT_USER_ID:
+                    text = re.sub(f'<@{BOT_USER_ID}>', '@Claudio', text)
+                context_parts.append(f"{sender}: {text}")
+
+        if not context_parts:
+            return ""
+
+        return (
+            "--- CONTEXTO DEL HILO DE SLACK ---\n"
+            "Los siguientes son los mensajes previos en este hilo. "
+            "Úsalos como contexto para responder al último mensaje.\n\n"
+            + "\n\n".join(context_parts)
+            + "\n--- FIN DEL CONTEXTO ---\n\n"
+        )
+
+    except Exception as e:
+        logger.warning(f"Error recuperando contexto del hilo: {e}")
+        return ""
+
+
 def split_message(text: str, max_length: int = MAX_MESSAGE_LENGTH) -> list:
     """Divide un mensaje largo en partes."""
     if len(text) <= max_length:
@@ -378,9 +437,9 @@ def get_bot_user_id():
 BOT_USER_ID = None  # Se inicializa en main()
 
 
-async def process_message(user_id: str, text: str, say, channel: str, thread_ts: str = None):
+async def process_message(user_id: str, text: str, say, channel: str, thread_ts: str = None, event_ts: str = None):
     """Procesa un mensaje y ejecuta en Claude CLI."""
-    
+
     # Verificar autorización
     if not is_user_authorized(user_id):
         logger.warning(f"[SEGURIDAD] Usuario no autorizado: {user_id}")
@@ -389,7 +448,7 @@ async def process_message(user_id: str, text: str, say, channel: str, thread_ts:
             thread_ts=thread_ts
         )
         return
-    
+
     # Rate limiting
     is_allowed, time_until_reset = check_rate_limit(user_id)
     if not is_allowed:
@@ -399,17 +458,27 @@ async def process_message(user_id: str, text: str, say, channel: str, thread_ts:
             thread_ts=thread_ts
         )
         return
-    
+
+    # Recuperar contexto del hilo si el mensaje viene de un thread
+    thread_context = ""
+    if thread_ts:
+        thread_context = fetch_thread_context(channel, thread_ts, current_ts=event_ts)
+        if thread_context:
+            logger.info(f"[Usuario {user_id}] Contexto de hilo recuperado ({len(thread_context)} chars)")
+
+    # Construir prompt con contexto del hilo
+    full_prompt = thread_context + text if thread_context else text
+
     # Validar longitud
-    if len(text) > MAX_INPUT_LENGTH:
+    if len(full_prompt) > MAX_INPUT_LENGTH:
         say(
             text=f"❌ *Mensaje demasiado largo*\n\nMáximo: {MAX_INPUT_LENGTH:,} caracteres.",
             thread_ts=thread_ts
         )
         return
-    
+
     logger.info(f"[Usuario {user_id}] Procesando: {text[:100]}...")
-    
+
     # Mostrar que está procesando
     result = app.client.chat_postMessage(
         channel=channel,
@@ -417,28 +486,28 @@ async def process_message(user_id: str, text: str, say, channel: str, thread_ts:
         thread_ts=thread_ts
     )
     processing_ts = result["ts"]
-    
+
     # Acumular output
     all_output = []
     has_received_output = False
-    
+
     async def handle_output(text_chunk: str):
         nonlocal all_output, has_received_output
         if text_chunk.strip():
             has_received_output = True
             all_output.append(text_chunk)
-    
+
     async def handle_error(error_text: str):
         nonlocal all_output, has_received_output
         if error_text.strip():
             has_received_output = True
             all_output.append(f"⚠️ {error_text}\n")
-    
+
     # Ejecutar
     continue_session = user_id in user_sessions
-    
+
     result = await executor.execute_streaming(
-        text,
+        full_prompt,
         user_id,
         continue_session,
         handle_output,
@@ -505,27 +574,37 @@ async def process_message(user_id: str, text: str, say, channel: str, thread_ts:
 
 # ============== SYNC PROCESS MESSAGE ==============
 
-def process_message_sync(user_id: str, text: str, say, channel: str, thread_ts: str = None):
+def process_message_sync(user_id: str, text: str, say, channel: str, thread_ts: str = None, event_ts: str = None):
     """Procesa un mensaje usando subprocess - igual que Telegram."""
     import threading
-    
+
     # Verificar autorización
     if not is_user_authorized(user_id):
         logger.warning(f"[SEGURIDAD] Usuario no autorizado: {user_id}")
         say(text="❌ *Acceso denegado*\n\nNo estás autorizado para usar este bot.", thread_ts=thread_ts)
         return
-    
+
     # Rate limiting
     is_allowed, time_until_reset = check_rate_limit(user_id)
     if not is_allowed:
         say(text=f"⏱️ *Rate limit excedido*\n\nEspera {int(time_until_reset)} segundos.", thread_ts=thread_ts)
         return
-    
-    # Validar longitud
-    if len(text) > MAX_INPUT_LENGTH:
+
+    # Recuperar contexto del hilo si el mensaje viene de un thread
+    thread_context = ""
+    if thread_ts:
+        thread_context = fetch_thread_context(channel, thread_ts, current_ts=event_ts)
+        if thread_context:
+            logger.info(f"[Usuario {user_id}] Contexto de hilo recuperado ({len(thread_context)} chars)")
+
+    # Construir prompt con contexto del hilo
+    full_prompt = thread_context + text if thread_context else text
+
+    # Validar longitud (después de agregar contexto)
+    if len(full_prompt) > MAX_INPUT_LENGTH:
         say(text=f"❌ *Mensaje demasiado largo*\n\nMáximo: {MAX_INPUT_LENGTH:,} caracteres.", thread_ts=thread_ts)
         return
-    
+
     logger.info(f"[Usuario {user_id}] Procesando: {text[:100]}...")
     
     # Mostrar que está procesando
@@ -574,7 +653,7 @@ def process_message_sync(user_id: str, text: str, say, channel: str, thread_ts: 
             
             process_result = subprocess.run(
                 cmd,
-                input=text,  # Pipe input en vez de -p
+                input=full_prompt,  # Pipe input con contexto del hilo
                 capture_output=True,
                 text=True,
                 timeout=COMMAND_TIMEOUT,
@@ -674,10 +753,11 @@ def handle_mention(event, say):
         )
         return
     
+    event_ts = event.get("ts")
     logger.info(f"[Mención] Usuario {user_id} en canal {channel}: {text[:50]}...")
-    
+
     # Ejecutar de forma síncrona
-    process_message_sync(user_id, text, say, channel, thread_ts)
+    process_message_sync(user_id, text, say, channel, thread_ts, event_ts=event_ts)
 
 
 @app.event("message")
@@ -705,10 +785,11 @@ def handle_dm(event, say):
     if not text:
         return
     
+    event_ts = event.get("ts")
     logger.info(f"[DM] Usuario {user_id}: {text[:50]}...")
-    
+
     # Ejecutar de forma síncrona
-    process_message_sync(user_id, text, say, channel, thread_ts)
+    process_message_sync(user_id, text, say, channel, thread_ts, event_ts=event_ts)
 
 
 # ============== COMANDOS SLASH (opcional) ==============
