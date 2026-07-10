@@ -80,6 +80,7 @@ Initiatives live in the **P&T - General** space, shared across all squads.
 | **Approved Initiatives** | `901213053436` | ✅ **QUERY INITIATIVES HERE** |
 | Backlog Initiatives | `901214672950` | Future/proposed initiatives |
 | Ideas/Feedback collection | `900302181879` | Raw ideas and feedback |
+| **InvestMap Feedback** | `901216076560` | ✅ **Feedback de InvestMap — crear sugerencias aquí** |
 
 ---
 
@@ -162,6 +163,7 @@ create_task(
 | Epics (Future) | `901213056240` | DS & AI Squad | Epics Backlog |
 | Initiatives | `901213053436` | P&T - General | Approved Initiatives |
 | Tech Debt | `901213056236` | DS & AI Squad | Tech Debt & Spikes |
+| InvestMap Feedback | `901216076560` | P&T - General | Sugerencias/feedback de InvestMap |
 
 > 📅 **The Epics list changes each quarter.** Update the ID when a new quarter starts.
 
