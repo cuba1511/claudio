@@ -68,6 +68,7 @@ claudio/
 │   │   ├── clickup/
 │   │   │   ├── config.md               # IDs y configuración ClickUp
 │   │   │   ├── guide.md
+│   │   │   ├── spp-process.md          # Proceso SPP (Initiatives, Tasks, Sprints)
 │   │   │   └── templates/
 │   │   ├── github/guide.md
 │   │   ├── slack/guide.md
@@ -165,6 +166,7 @@ template: usar_siempre
 ```
 
 **Qué hacer**:
+- SIEMPRE leer `docs/integrations/clickup/spp-process.md` para entender el ciclo SPP (Initiatives → Tasks → Sprints) y qué vista usar en cada fase
 - SIEMPRE leer la Initiative antes de crear Epics/User Stories
 - SIEMPRE usar templates de `docs/integrations/clickup/templates/`
 - SIEMPRE incluir Business Value

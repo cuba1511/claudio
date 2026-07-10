@@ -1,5 +1,9 @@
 # ClickUp Integration
 
+## Proceso DS & AI (SPP)
+
+Para entender el ciclo de planificación — Initiatives Roadmap, Tasks Management y Sprint Management — ver [`spp-process.md`](./spp-process.md).
+
 ## Configuración
 
 Usa el MCP server `@taazkareem/clickup-mcp-server`.

@@ -13,6 +13,7 @@ docs/
 │   ├── clickup/
 │   │   ├── config.md               ← IDs de listas y espacios
 │   │   ├── guide.md                ← Guia de uso
+│   │   ├── spp-process.md          ← Proceso SPP (Initiatives, Tasks, Sprints)
 │   │   └── templates/              ← Templates para artifacts
 │   │       ├── initiative.md
 │   │       ├── epic.md
@@ -58,6 +59,7 @@ Documenta **cada integracion MCP en detalle**:
 ### docs/integrations/clickup/
 Configuracion especifica de ClickUp para PropHero:
 - IDs de listas y espacios (`config.md`)
+- Proceso SPP del squad DS & AI (`spp-process.md`)
 - Templates para Initiatives, Epics, User Stories (`templates/`)
 
 ### docs/workflows/
