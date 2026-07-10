@@ -1,9 +1,9 @@
 {
   "mcpServers": {
-    "google-docs-mcp": {
+    "google-docs": {
       "command": "node",
       "args": [
-        "/Users/ignaciodelacuba/Dev/mcp-servers/mcp-googledocs-server/dist/server.js"
+        "/Users/ignaciodelacuba/mcps/google-docs-mcp/dist/index.js"
       ]
     },
     "github": {
@@ -49,6 +49,9 @@
       "env": {
         "GRANOLA_CACHE_PATH": "/Users/ignaciodelacuba/Library/Application Support/Granola/cache-v3.json"
       }
+    },
+    "notion": {
+      "url": "https://mcp.notion.com/mcp"
     }
   }
 }
